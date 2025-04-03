@@ -11,6 +11,8 @@ let scale = 1;
 let imageLoaded = false;
 let processedImg;
 let canvas;
+let isPixelated = false;
+let pixelationLevel = 10;
 
 // DOM elements
 let threshold1Slider;
@@ -26,6 +28,7 @@ let backgroundHex;
 let saveButton;
 let imageUpload;
 let fileName;
+let pixelateButton;
 
 // Threshold configuration
 let thresholds = [
@@ -84,6 +87,11 @@ function updateBackgroundColor() {
   const color = backgroundColorPicker.value();
   backgroundColor = color;
   backgroundHex.value(color);
+}
+
+function togglePixelation() {
+  isPixelated = !isPixelated;
+  pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
 }
 
 function addNewThreshold() {
@@ -183,6 +191,7 @@ function setup() {
   saveButton = select('#save-btn');
   imageUpload = select('#image-upload');
   fileName = select('#file-name');
+  pixelateButton = select('#pixelate-btn');
   
   // Set up event listeners
   threshold1Slider.input(updateThreshold1Value);
@@ -195,6 +204,7 @@ function setup() {
   backgroundHex.input(updateBackgroundHex);
   saveButton.mousePressed(saveDitheredImage);
   imageUpload.input(handleFileUpload);
+  pixelateButton.mousePressed(togglePixelation);
   
   // Add threshold button listener
   select('#add-threshold').mousePressed(addNewThreshold);
@@ -230,6 +240,32 @@ function draw() {
   // Create a copy of the image for processing
   let processed = createGraphics(img.width, img.height);
   processed.image(img, 0, 0);
+  
+  if (isPixelated) {
+    // Apply pixelation
+    processed.loadPixels();
+    let pixelated = createGraphics(img.width, img.height);
+    pixelated.background(255);
+    
+    for (let x = 0; x < processed.width; x += pixelationLevel) {
+      for (let y = 0; y < processed.height; y += pixelationLevel) {
+        // Get the color at this pixel
+        let i = (x + y * processed.width) * 4;
+        let r = processed.pixels[i];
+        let g = processed.pixels[i + 1];
+        let b = processed.pixels[i + 2];
+        let a = processed.pixels[i + 3];
+        
+        // Fill the pixel block with the sampled color
+        pixelated.fill(r, g, b, a);
+        pixelated.noStroke();
+        pixelated.rect(x, y, pixelationLevel, pixelationLevel);
+      }
+    }
+    
+    processed = pixelated;
+  }
+  
   processed.loadPixels();
   
   // Apply multi-threshold coloring
@@ -350,6 +386,32 @@ function saveDitheredImage() {
   // Process the image
   let processed = createGraphics(img.width, img.height);
   processed.image(img, 0, 0);
+  
+  if (isPixelated) {
+    // Apply pixelation
+    processed.loadPixels();
+    let pixelated = createGraphics(img.width, img.height);
+    pixelated.background(255);
+    
+    for (let x = 0; x < processed.width; x += pixelationLevel) {
+      for (let y = 0; y < processed.height; y += pixelationLevel) {
+        // Get the color at this pixel
+        let i = (x + y * processed.width) * 4;
+        let r = processed.pixels[i];
+        let g = processed.pixels[i + 1];
+        let b = processed.pixels[i + 2];
+        let a = processed.pixels[i + 3];
+        
+        // Fill the pixel block with the sampled color
+        pixelated.fill(r, g, b, a);
+        pixelated.noStroke();
+        pixelated.rect(x, y, pixelationLevel, pixelationLevel);
+      }
+    }
+    
+    processed = pixelated;
+  }
+  
   processed.loadPixels();
   
   // Apply multi-threshold coloring

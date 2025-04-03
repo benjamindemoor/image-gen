@@ -385,6 +385,37 @@ input[type="color"] {
   background: #1976D2;
 }
 
+/* Effects Controls */
+.effects-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.effect-button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.effect-button:hover {
+  background: #5a6268;
+}
+
+.effect-button.active {
+  background: #17a2b8;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   body {
