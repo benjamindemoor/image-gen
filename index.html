@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Image Dithering Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="p5.riso.js"></script>
+    <script src="sketch.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Image Dithering Generator</h1>
+        </header>
+        
+        <div class="upload-section">
+            <h3>Upload Your Image</h3>
+            <div class="file-upload">
+                <input type="file" id="image-upload" accept="image/*">
+                <label for="image-upload" class="upload-button">Choose Image</label>
+                <span id="file-name">No file chosen</span>
+            </div>
+            <p class="upload-hint">Supported formats: JPG, PNG, GIF</p>
+        </div>
+        
+        <div id="canvas-container"></div>
+        
+        <div class="control-panel">
+            <div class="control-section">
+                <h3>Dither Algorithm</h3>
+                <div class="dither-buttons">
+                    <button id="atkinson-btn" class="dither-btn active">Atkinson</button>
+                    <button id="floydsteinberg-btn" class="dither-btn">Floyd-Steinberg</button>
+                    <button id="bayer-btn" class="dither-btn">Bayer</button>
+                    <button id="none-btn" class="dither-btn">None</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Threshold: <span id="threshold-value">128</span></h3>
+                <input type="range" id="threshold-slider" min="0" max="255" value="128" class="slider">
+            </div>
+            
+            <div class="control-section">
+                <h3>Colors</h3>
+                <div class="color-controls">
+                    <div class="color-option">
+                        <label for="dither-color-picker">Dithered Areas:</label>
+                        <input type="color" id="dither-color-picker" value="#000000">
+                    </div>
+                    <div class="color-option">
+                        <label for="background-color-picker">Background:</label>
+                        <input type="color" id="background-color-picker" value="#FFFFFF">
+                    </div>
+                </div>
+            </div>
+            
+            <button id="save-btn" class="save-button">Save Processed Image</button>
+        </div>
+        
+        <div class="info-panel">
+            <h3>How to Use</h3>
+            <div class="info-content">
+                <p>1. Upload an image using the file upload button</p>
+                <p>2. Select a dither algorithm using the buttons above</p>
+                <p>3. Adjust the threshold using the slider</p>
+                <p>4. Choose colors for the dithered areas and background</p>
+                <p>5. Click "Save Processed Image" to download the result</p>
+                <p>6. You can also use keyboard shortcuts (1-4) to switch algorithms</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 
