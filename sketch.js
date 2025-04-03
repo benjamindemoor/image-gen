@@ -9,7 +9,8 @@ let originalWidth;
 let originalHeight;
 let scale = 1;
 let imageLoaded = false;
-let processedImg;
+let processedGraphics; // Reusable graphics buffer
+let pixelatedGraphics; // Reusable graphics buffer for pixelation
 let canvas;
 let isPixelated = true;
 let pixelationLevel = 10;
@@ -97,6 +98,11 @@ function updatePixelationLevel() {
   pixelationValue.html(pixelationLevel);
 }
 
+function togglePixelation() {
+  isPixelated = !isPixelated;
+  pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
+}
+
 function addNewThreshold() {
   thresholdCount++;
   const thresholdContainer = select('#threshold-container');
@@ -176,7 +182,7 @@ function removeThreshold(thresholdGroup, index) {
 function setup() {
   pixelDensity(1);
   
-  // Create canvas with initial size
+  // Create canvas with initial size - only once
   canvas = createCanvas(800, 800);
   canvas.parent('canvas-container');
   
@@ -211,6 +217,7 @@ function setup() {
   saveButton.mousePressed(saveDitheredImage);
   imageUpload.input(handleFileUpload);
   pixelationSlider.input(updatePixelationLevel);
+  pixelateButton.mousePressed(togglePixelation);
   
   // Set initial state of pixelation button
   pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
@@ -246,40 +253,53 @@ function draw() {
   // Draw original image on the left side
   image(img, 0, 0, originalWidth * scale, originalHeight * scale);
   
-  // Create a copy of the image for processing
-  let processed = createGraphics(img.width, img.height);
-  processed.image(img, 0, 0);
+  // Create graphics buffers only once when needed
+  if (!processedGraphics && img) {
+    processedGraphics = createGraphics(img.width, img.height);
+  }
+  
+  if (!pixelatedGraphics && img) {
+    pixelatedGraphics = createGraphics(img.width, img.height);
+  }
+  
+  // Clear previous content
+  processedGraphics.clear();
+  processedGraphics.image(img, 0, 0);
+  
+  let processedImage = processedGraphics;
   
   if (isPixelated) {
-    // Apply pixelation
-    processed.loadPixels();
-    let pixelated = createGraphics(img.width, img.height);
-    pixelated.background(255);
+    // Apply pixelation using existing pixelatedGraphics
+    pixelatedGraphics.clear();
+    pixelatedGraphics.background(255);
     
-    for (let x = 0; x < processed.width; x += pixelationLevel) {
-      for (let y = 0; y < processed.height; y += pixelationLevel) {
+    processedGraphics.loadPixels();
+    
+    for (let x = 0; x < processedGraphics.width; x += pixelationLevel) {
+      for (let y = 0; y < processedGraphics.height; y += pixelationLevel) {
         // Get the color at this pixel
-        let i = (x + y * processed.width) * 4;
-        let r = processed.pixels[i];
-        let g = processed.pixels[i + 1];
-        let b = processed.pixels[i + 2];
-        let a = processed.pixels[i + 3];
+        let i = (x + y * processedGraphics.width) * 4;
+        let r = processedGraphics.pixels[i];
+        let g = processedGraphics.pixels[i + 1];
+        let b = processedGraphics.pixels[i + 2];
+        let a = processedGraphics.pixels[i + 3];
         
         // Fill the pixel block with the sampled color
-        pixelated.fill(r, g, b, a);
-        pixelated.noStroke();
-        pixelated.rect(x, y, pixelationLevel, pixelationLevel);
+        pixelatedGraphics.fill(r, g, b, a);
+        pixelatedGraphics.noStroke();
+        pixelatedGraphics.rect(x, y, pixelationLevel, pixelationLevel);
       }
     }
     
-    processed = pixelated;
+    processedImage = pixelatedGraphics;
   }
   
-  processed.loadPixels();
+  // Apply thresholds
+  processedImage.loadPixels();
   
   // Apply multi-threshold coloring
-  for (let i = 0; i < processed.pixels.length; i += 4) {
-    const gray = (processed.pixels[i] + processed.pixels[i + 1] + processed.pixels[i + 2]) / 3;
+  for (let i = 0; i < processedImage.pixels.length; i += 4) {
+    const gray = (processedImage.pixels[i] + processedImage.pixels[i + 1] + processedImage.pixels[i + 2]) / 3;
     
     // Find the appropriate threshold level
     let colorIndex = thresholds.length;
@@ -294,15 +314,15 @@ function draw() {
     const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
     
     // Apply the color
-    processed.pixels[i] = color.r;
-    processed.pixels[i + 1] = color.g;
-    processed.pixels[i + 2] = color.b;
+    processedImage.pixels[i] = color.r;
+    processedImage.pixels[i + 1] = color.g;
+    processedImage.pixels[i + 2] = color.b;
   }
   
-  processed.updatePixels();
+  processedImage.updatePixels();
   
   // Draw the processed image
-  image(processed, originalWidth * scale, 0, originalWidth * scale, originalHeight * scale);
+  image(processedImage, originalWidth * scale, 0, originalWidth * scale, originalHeight * scale);
   
   // Draw labels
   fill(0);
@@ -321,6 +341,17 @@ function handleFileUpload() {
     const reader = new FileReader();
     
     reader.onload = function(event) {
+      // Clean up old graphics objects
+      if (processedGraphics) {
+        processedGraphics.remove();
+        processedGraphics = null;
+      }
+      
+      if (pixelatedGraphics) {
+        pixelatedGraphics.remove();
+        pixelatedGraphics = null;
+      }
+      
       // Create a new image from the file data
       img = loadImage(event.target.result, onImageLoaded);
     };
@@ -341,6 +372,17 @@ function onImageLoaded() {
   
   // Resize canvas
   resizeCanvas(canvasWidth, canvasHeight);
+  
+  // Create new graphics buffers sized to the new image
+  if (processedGraphics) {
+    processedGraphics.remove();
+  }
+  if (pixelatedGraphics) {
+    pixelatedGraphics.remove();
+  }
+  
+  processedGraphics = createGraphics(img.width, img.height);
+  pixelatedGraphics = createGraphics(img.width, img.height);
 }
 
 function handleResize() {
@@ -388,68 +430,93 @@ function saveDitheredImage() {
     saveButton.style('background-color', '#2196F3');
   }, 200);
   
-  // Create a temporary canvas for the processed image
-  let tempCanvas = createGraphics(img.width, img.height);
-  tempCanvas.background(255);
+  // Use existing graphics objects for saving
+  let saveCanvas = createGraphics(img.width, img.height);
   
-  // Process the image
-  let processed = createGraphics(img.width, img.height);
-  processed.image(img, 0, 0);
-  
+  // Process using existing graphics objects
   if (isPixelated) {
-    // Apply pixelation
-    processed.loadPixels();
-    let pixelated = createGraphics(img.width, img.height);
-    pixelated.background(255);
+    // Apply pixelation using the existing pixelatedGraphics
+    processedGraphics.loadPixels();
+    pixelatedGraphics.clear();
+    pixelatedGraphics.background(255);
     
-    for (let x = 0; x < processed.width; x += pixelationLevel) {
-      for (let y = 0; y < processed.height; y += pixelationLevel) {
+    for (let x = 0; x < processedGraphics.width; x += pixelationLevel) {
+      for (let y = 0; y < processedGraphics.height; y += pixelationLevel) {
         // Get the color at this pixel
-        let i = (x + y * processed.width) * 4;
-        let r = processed.pixels[i];
-        let g = processed.pixels[i + 1];
-        let b = processed.pixels[i + 2];
-        let a = processed.pixels[i + 3];
+        let i = (x + y * processedGraphics.width) * 4;
+        let r = processedGraphics.pixels[i];
+        let g = processedGraphics.pixels[i + 1];
+        let b = processedGraphics.pixels[i + 2];
+        let a = processedGraphics.pixels[i + 3];
         
         // Fill the pixel block with the sampled color
-        pixelated.fill(r, g, b, a);
-        pixelated.noStroke();
-        pixelated.rect(x, y, pixelationLevel, pixelationLevel);
+        pixelatedGraphics.fill(r, g, b, a);
+        pixelatedGraphics.noStroke();
+        pixelatedGraphics.rect(x, y, pixelationLevel, pixelationLevel);
       }
     }
     
-    processed = pixelated;
-  }
-  
-  processed.loadPixels();
-  
-  // Apply multi-threshold coloring
-  for (let i = 0; i < processed.pixels.length; i += 4) {
-    const gray = (processed.pixels[i] + processed.pixels[i + 1] + processed.pixels[i + 2]) / 3;
+    pixelatedGraphics.loadPixels();
     
-    // Find the appropriate threshold level
-    let colorIndex = thresholds.length;
-    for (let j = 0; j < thresholds.length; j++) {
-      if (gray <= thresholds[j].level) {
-        colorIndex = j;
-        break;
+    // Apply multi-threshold coloring to pixelated image
+    for (let i = 0; i < pixelatedGraphics.pixels.length; i += 4) {
+      const gray = (pixelatedGraphics.pixels[i] + pixelatedGraphics.pixels[i + 1] + pixelatedGraphics.pixels[i + 2]) / 3;
+      
+      // Find the appropriate threshold level
+      let colorIndex = thresholds.length;
+      for (let j = 0; j < thresholds.length; j++) {
+        if (gray <= thresholds[j].level) {
+          colorIndex = j;
+          break;
+        }
       }
+      
+      // Convert hex color to RGB
+      const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
+      
+      // Apply the color
+      pixelatedGraphics.pixels[i] = color.r;
+      pixelatedGraphics.pixels[i + 1] = color.g;
+      pixelatedGraphics.pixels[i + 2] = color.b;
     }
     
-    // Convert hex color to RGB
-    const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
+    pixelatedGraphics.updatePixels();
+    saveCanvas.image(pixelatedGraphics, 0, 0);
+  } else {
+    // Apply thresholds directly to processed image
+    processedGraphics.loadPixels();
     
-    // Apply the color
-    processed.pixels[i] = color.r;
-    processed.pixels[i + 1] = color.g;
-    processed.pixels[i + 2] = color.b;
+    // Apply multi-threshold coloring
+    for (let i = 0; i < processedGraphics.pixels.length; i += 4) {
+      const gray = (processedGraphics.pixels[i] + processedGraphics.pixels[i + 1] + processedGraphics.pixels[i + 2]) / 3;
+      
+      // Find the appropriate threshold level
+      let colorIndex = thresholds.length;
+      for (let j = 0; j < thresholds.length; j++) {
+        if (gray <= thresholds[j].level) {
+          colorIndex = j;
+          break;
+        }
+      }
+      
+      // Convert hex color to RGB
+      const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
+      
+      // Apply the color
+      processedGraphics.pixels[i] = color.r;
+      processedGraphics.pixels[i + 1] = color.g;
+      processedGraphics.pixels[i + 2] = color.b;
+    }
+    
+    processedGraphics.updatePixels();
+    saveCanvas.image(processedGraphics, 0, 0);
   }
   
-  processed.updatePixels();
-  tempCanvas.image(processed, 0, 0);
+  // Save the image
+  saveCanvas.save('processed-image');
   
-  // Save the temporary canvas
-  saveCanvas(tempCanvas, 'processed-image', 'png');
+  // Clean up the temporary canvas
+  saveCanvas.remove();
 }
 
 function loadDefaultImage() {
