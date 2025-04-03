@@ -66,8 +66,10 @@
             
             <div class="control-section">
                 <h3>Effects</h3>
-                <div class="effects-controls">
-                    <button id="pixelate-btn" class="effect-button">Pixelate Image</button>
+                <button id="pixelate-btn" class="effect-button">Pixelate</button>
+                <div id="pixelation-control" class="pixelation-control">
+                    <label>Pixel Size: <span id="pixelation-value">10</span></label>
+                    <input type="range" id="pixelation-slider" class="slider" min="1" max="50" value="10">
                 </div>
             </div>
             
@@ -86,4 +88,4 @@
         </div>
     </div>
 </body>
-</html> 
+</html>

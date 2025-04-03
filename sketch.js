@@ -11,7 +11,7 @@ let scale = 1;
 let imageLoaded = false;
 let processedImg;
 let canvas;
-let isPixelated = false;
+let isPixelated = true;
 let pixelationLevel = 10;
 
 // DOM elements
@@ -29,6 +29,9 @@ let saveButton;
 let imageUpload;
 let fileName;
 let pixelateButton;
+let pixelationSlider;
+let pixelationValue;
+let pixelationControl;
 
 // Threshold configuration
 let thresholds = [
@@ -89,9 +92,9 @@ function updateBackgroundColor() {
   backgroundHex.value(color);
 }
 
-function togglePixelation() {
-  isPixelated = !isPixelated;
-  pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
+function updatePixelationLevel() {
+  pixelationLevel = parseInt(pixelationSlider.value());
+  pixelationValue.html(pixelationLevel);
 }
 
 function addNewThreshold() {
@@ -174,7 +177,7 @@ function setup() {
   pixelDensity(1);
   
   // Create canvas with initial size
-  let canvas = createCanvas(800, 400);
+  canvas = createCanvas(800, 800);
   canvas.parent('canvas-container');
   
   // Get DOM elements
@@ -192,6 +195,9 @@ function setup() {
   imageUpload = select('#image-upload');
   fileName = select('#file-name');
   pixelateButton = select('#pixelate-btn');
+  pixelationSlider = select('#pixelation-slider');
+  pixelationValue = select('#pixelation-value');
+  pixelationControl = select('#pixelation-control');
   
   // Set up event listeners
   threshold1Slider.input(updateThreshold1Value);
@@ -204,7 +210,10 @@ function setup() {
   backgroundHex.input(updateBackgroundHex);
   saveButton.mousePressed(saveDitheredImage);
   imageUpload.input(handleFileUpload);
-  pixelateButton.mousePressed(togglePixelation);
+  pixelationSlider.input(updatePixelationLevel);
+  
+  // Set initial state of pixelation button
+  pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
   
   // Add threshold button listener
   select('#add-threshold').mousePressed(addNewThreshold);
@@ -445,7 +454,7 @@ function saveDitheredImage() {
 
 function loadDefaultImage() {
   // Load a default image for preview
-  img = loadImage('https://picsum.photos/800/400', onImageLoaded);
+  img = loadImage('https://picsum.photos/800/800', onImageLoaded);
 }
 
 function isValidHex(hex) {
@@ -458,4 +467,4 @@ function updateBackgroundHex() {
     backgroundColor = hex;
     backgroundColorPicker.value(hex);
   }
-} 
+}
