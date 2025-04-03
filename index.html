@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Image Dithering Generator</title>
+    <title>Image Posterization Generator</title>
     <link rel="stylesheet" href="style.css">
     <!-- p5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="p5.riso.js"></script>
     <script src="sketch.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Image Dithering Generator</h1>
+            <h1>Image Posterization Generator</h1>
         </header>
         
         <div class="upload-section">
@@ -30,30 +29,37 @@
         
         <div class="control-panel">
             <div class="control-section">
-                <h3>Dither Algorithm</h3>
-                <div class="dither-buttons">
-                    <button id="atkinson-btn" class="dither-btn active">Atkinson</button>
-                    <button id="floydsteinberg-btn" class="dither-btn">Floyd-Steinberg</button>
-                    <button id="bayer-btn" class="dither-btn">Bayer</button>
-                    <button id="none-btn" class="dither-btn">None</button>
-                </div>
-            </div>
-            
-            <div class="control-section">
-                <h3>Threshold: <span id="threshold-value">128</span></h3>
-                <input type="range" id="threshold-slider" min="0" max="255" value="128" class="slider">
-            </div>
-            
-            <div class="control-section">
-                <h3>Colors</h3>
-                <div class="color-controls">
-                    <div class="color-option">
-                        <label for="dither-color-picker">Dithered Areas:</label>
-                        <input type="color" id="dither-color-picker" value="#000000">
+                <h3>Thresholds</h3>
+                <div class="threshold-controls" id="threshold-container">
+                    <div class="threshold-group">
+                        <label for="threshold1-slider">Threshold 1: <span id="threshold1-value">128</span></label>
+                        <input type="range" id="threshold1-slider" min="0" max="255" value="128" class="slider">
+                        <div class="color-option">
+                            <label for="threshold1-color-picker">Color 1:</label>
+                            <input type="color" id="threshold1-color-picker" value="#000000">
+                            <input type="text" id="threshold1-hex" value="#000000" class="hex-input" maxlength="7">
+                        </div>
                     </div>
+                    <div class="threshold-group">
+                        <label for="threshold2-slider">Threshold 2: <span id="threshold2-value">200</span></label>
+                        <input type="range" id="threshold2-slider" min="0" max="255" value="200" class="slider">
+                        <div class="color-option">
+                            <label for="threshold2-color-picker">Color 2:</label>
+                            <input type="color" id="threshold2-color-picker" value="#666666">
+                            <input type="text" id="threshold2-hex" value="#666666" class="hex-input" maxlength="7">
+                        </div>
+                    </div>
+                </div>
+                <button id="add-threshold" class="add-button">Add Threshold</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>Background Color</h3>
+                <div class="color-controls">
                     <div class="color-option">
                         <label for="background-color-picker">Background:</label>
                         <input type="color" id="background-color-picker" value="#FFFFFF">
+                        <input type="text" id="background-hex" value="#FFFFFF" class="hex-input" maxlength="7">
                     </div>
                 </div>
             </div>
@@ -65,11 +71,10 @@
             <h3>How to Use</h3>
             <div class="info-content">
                 <p>1. Upload an image using the file upload button</p>
-                <p>2. Select a dither algorithm using the buttons above</p>
-                <p>3. Adjust the threshold using the slider</p>
-                <p>4. Choose colors for the dithered areas and background</p>
+                <p>2. Adjust the threshold levels using the sliders</p>
+                <p>3. Choose colors for each threshold level</p>
+                <p>4. Select a background color</p>
                 <p>5. Click "Save Processed Image" to download the result</p>
-                <p>6. You can also use keyboard shortcuts (1-4) to switch algorithms</p>
             </div>
         </div>
     </div>

@@ -1,27 +1,166 @@
 // Image Dithering Generator
 // A modern UI for applying dithering effects to images
 
-let black;
 let img;
-let ditherType = 'bayer';
 let canvasWidth;
 let canvasHeight;
-let ditherColor = '#000000';
 let backgroundColor = '#FFFFFF';
 let originalWidth;
 let originalHeight;
 let scale = 1;
 let imageLoaded = false;
+let processedImg;
+let canvas;
 
 // DOM elements
-let thresholdSlider;
-let thresholdValue;
-let ditherColorPicker;
+let threshold1Slider;
+let threshold1Value;
+let threshold1ColorPicker;
+let threshold1Hex;
+let threshold2Slider;
+let threshold2Value;
+let threshold2ColorPicker;
+let threshold2Hex;
 let backgroundColorPicker;
+let backgroundHex;
 let saveButton;
-let ditherButtons = [];
 let imageUpload;
 let fileName;
+
+// Threshold configuration
+let thresholds = [
+  { level: 128, color: '#000000' },
+  { level: 200, color: '#666666' }
+];
+
+let thresholdCount = 2;
+
+// Threshold management functions
+function updateThresholdValue(index, slider, valueSpan) {
+  const value = parseInt(slider.value());
+  valueSpan.html(value);
+  thresholds[index - 1].level = value;
+}
+
+function updateThresholdColor(index, colorPicker, hexInput) {
+  const color = colorPicker.value();
+  thresholds[index - 1].color = color;
+  hexInput.value(color);
+}
+
+function updateThresholdHex(index, hexInput, colorPicker) {
+  const hex = hexInput.value();
+  if (isValidHex(hex)) {
+    thresholds[index - 1].color = hex;
+    colorPicker.value(hex);
+  }
+}
+
+function updateThreshold1Value() {
+  updateThresholdValue(1, threshold1Slider, threshold1Value);
+}
+
+function updateThreshold2Value() {
+  updateThresholdValue(2, threshold2Slider, threshold2Value);
+}
+
+function updateThreshold1Color() {
+  updateThresholdColor(1, threshold1ColorPicker, threshold1Hex);
+}
+
+function updateThreshold2Color() {
+  updateThresholdColor(2, threshold2ColorPicker, threshold2Hex);
+}
+
+function updateThreshold1Hex() {
+  updateThresholdHex(1, threshold1Hex, threshold1ColorPicker);
+}
+
+function updateThreshold2Hex() {
+  updateThresholdHex(2, threshold2Hex, threshold2ColorPicker);
+}
+
+function updateBackgroundColor() {
+  const color = backgroundColorPicker.value();
+  backgroundColor = color;
+  backgroundHex.value(color);
+}
+
+function addNewThreshold() {
+  thresholdCount++;
+  const thresholdContainer = select('#threshold-container');
+  
+  // Create new threshold group
+  const thresholdGroup = createDiv('');
+  thresholdGroup.class('threshold-group');
+  
+  // Create remove button
+  const removeButton = createButton('×');
+  removeButton.class('remove-threshold');
+  removeButton.mousePressed(() => removeThreshold(thresholdGroup, thresholdCount));
+  
+  // Create label
+  const label = createElement('label', `Threshold ${thresholdCount}: `);
+  const valueSpan = createSpan('128');
+  valueSpan.id(`threshold${thresholdCount}-value`);
+  label.child(valueSpan);
+  label.attribute('for', `threshold${thresholdCount}-slider`);
+  
+  // Create slider
+  const slider = createInput(128, 'range');
+  slider.id(`threshold${thresholdCount}-slider`);
+  slider.class('slider');
+  slider.attribute('min', 0);
+  slider.attribute('max', 255);
+  slider.input(() => updateThresholdValue(thresholdCount, slider, valueSpan));
+  
+  // Create color option
+  const colorOption = createDiv('');
+  colorOption.class('color-option');
+  
+  const colorLabel = createElement('label', `Color ${thresholdCount}:`);
+  colorLabel.attribute('for', `threshold${thresholdCount}-color-picker`);
+  
+  const colorPicker = createInput('#000000', 'color');
+  colorPicker.id(`threshold${thresholdCount}-color-picker`);
+  colorPicker.input(() => updateThresholdColor(thresholdCount, colorPicker, hexInput));
+  
+  const hexInput = createInput('#000000', 'text');
+  hexInput.id(`threshold${thresholdCount}-hex`);
+  hexInput.class('hex-input');
+  hexInput.attribute('maxlength', 7);
+  hexInput.input(() => updateThresholdHex(thresholdCount, hexInput, colorPicker));
+  
+  // Assemble the elements
+  colorOption.child(colorLabel);
+  colorOption.child(colorPicker);
+  colorOption.child(hexInput);
+  
+  thresholdGroup.child(removeButton);
+  thresholdGroup.child(label);
+  thresholdGroup.child(slider);
+  thresholdGroup.child(colorOption);
+  
+  thresholdContainer.child(thresholdGroup);
+  
+  // Add to thresholds array
+  thresholds.push({ level: 128, color: '#000000' });
+}
+
+function removeThreshold(thresholdGroup, index) {
+  thresholdGroup.remove();
+  thresholds.splice(index - 1, 1);
+  thresholdCount--;
+  
+  // Update remaining threshold numbers
+  const thresholdGroups = selectAll('.threshold-group');
+  thresholdGroups.forEach((group, i) => {
+    const label = group.select('label');
+    const colorLabel = group.select('.color-option label');
+    label.html(`Threshold ${i + 1}: <span id="threshold${i + 1}-value">${thresholds[i].level}</span>`);
+    colorLabel.html(`Color ${i + 1}:`);
+  });
+}
 
 function setup() {
   pixelDensity(1);
@@ -31,40 +170,34 @@ function setup() {
   canvas.parent('canvas-container');
   
   // Get DOM elements
-  thresholdSlider = select('#threshold-slider');
-  thresholdValue = select('#threshold-value');
-  ditherColorPicker = select('#dither-color-picker');
+  threshold1Slider = select('#threshold1-slider');
+  threshold1Value = select('#threshold1-value');
+  threshold1ColorPicker = select('#threshold1-color-picker');
+  threshold1Hex = select('#threshold1-hex');
+  threshold2Slider = select('#threshold2-slider');
+  threshold2Value = select('#threshold2-value');
+  threshold2ColorPicker = select('#threshold2-color-picker');
+  threshold2Hex = select('#threshold2-hex');
   backgroundColorPicker = select('#background-color-picker');
+  backgroundHex = select('#background-hex');
   saveButton = select('#save-btn');
   imageUpload = select('#image-upload');
   fileName = select('#file-name');
   
-  // Get dither buttons
-  ditherButtons = [
-    select('#atkinson-btn'),
-    select('#floydsteinberg-btn'),
-    select('#bayer-btn'),
-    select('#none-btn')
-  ];
-  
   // Set up event listeners
-  thresholdSlider.input(updateThresholdValue);
-  ditherColorPicker.input(updateDitherColor);
+  threshold1Slider.input(updateThreshold1Value);
+  threshold1ColorPicker.input(updateThreshold1Color);
+  threshold1Hex.input(updateThreshold1Hex);
+  threshold2Slider.input(updateThreshold2Value);
+  threshold2ColorPicker.input(updateThreshold2Color);
+  threshold2Hex.input(updateThreshold2Hex);
   backgroundColorPicker.input(updateBackgroundColor);
+  backgroundHex.input(updateBackgroundHex);
   saveButton.mousePressed(saveDitheredImage);
   imageUpload.input(handleFileUpload);
   
-  // Set up dither button event listeners
-  ditherButtons[0].mousePressed(() => setDitherType('atkinson', 0));
-  ditherButtons[1].mousePressed(() => setDitherType('floydsteinberg', 1));
-  ditherButtons[2].mousePressed(() => setDitherType('bayer', 2));
-  ditherButtons[3].mousePressed(() => setDitherType('none', 3));
-  
-  // Initialize Riso (only used for dithering, not for display)
-  black = new Riso('black');
-  
-  // Set initial active button
-  updateDitherButtons();
+  // Add threshold button listener
+  select('#add-threshold').mousePressed(addNewThreshold);
   
   // Add window resize event listener
   window.addEventListener('resize', handleResize);
@@ -80,9 +213,58 @@ function setup() {
   text("Please upload an image or wait for default image to load", width/2, height/2);
 }
 
-function loadDefaultImage() {
-  // Load the default image
-  img = loadImage('data/images/images (7).jpeg', onImageLoaded);
+function draw() {
+  background(255);
+  
+  if (!imageLoaded) {
+    fill(0);
+    textSize(16);
+    textAlign(CENTER, CENTER);
+    text("Please upload an image or wait for default image to load", width/2, height/2);
+    return;
+  }
+  
+  // Draw original image on the left side
+  image(img, 0, 0, originalWidth * scale, originalHeight * scale);
+  
+  // Create a copy of the image for processing
+  let processed = createGraphics(img.width, img.height);
+  processed.image(img, 0, 0);
+  processed.loadPixels();
+  
+  // Apply multi-threshold coloring
+  for (let i = 0; i < processed.pixels.length; i += 4) {
+    const gray = (processed.pixels[i] + processed.pixels[i + 1] + processed.pixels[i + 2]) / 3;
+    
+    // Find the appropriate threshold level
+    let colorIndex = thresholds.length;
+    for (let j = 0; j < thresholds.length; j++) {
+      if (gray <= thresholds[j].level) {
+        colorIndex = j;
+        break;
+      }
+    }
+    
+    // Convert hex color to RGB
+    const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
+    
+    // Apply the color
+    processed.pixels[i] = color.r;
+    processed.pixels[i + 1] = color.g;
+    processed.pixels[i + 2] = color.b;
+  }
+  
+  processed.updatePixels();
+  
+  // Draw the processed image
+  image(processed, originalWidth * scale, 0, originalWidth * scale, originalHeight * scale);
+  
+  // Draw labels
+  fill(0);
+  textSize(16 * scale);
+  textAlign(CENTER);
+  text("Original Image", originalWidth * scale / 2, 20 * scale);
+  text("Processed Image", originalWidth * scale + originalWidth * scale / 2, 20 * scale);
 }
 
 function handleFileUpload() {
@@ -137,106 +319,6 @@ function calculateScale() {
   canvasHeight = originalHeight * scale;
 }
 
-function draw() {
-  background(255);
-
-  if (!imageLoaded) {
-    fill(0);
-    textSize(16);
-    textAlign(CENTER, CENTER);
-    text("Please upload an image or wait for default image to load", width/2, height/2);
-    return;
-  }
-
-  // Draw original image on the left side
-  image(img, 0, 0, originalWidth * scale, originalHeight * scale);
-  
-  // Draw dithered image on the right side
-  let threshold = thresholdSlider.value();
-
-  // Apply dithering effect
-  let dithered = ditherImage(img, ditherType, threshold);
-  
-  // Apply custom colors
-  let coloredDithered = createGraphics(img.width, img.height);
-  coloredDithered.loadPixels();
-  dithered.loadPixels();
-  
-  // Convert hex colors to RGB
-  let ditherRGB = hexToRgb(ditherColor);
-  let backgroundRGB = hexToRgb(backgroundColor);
-  
-  for (let i = 0; i < dithered.pixels.length; i += 4) {
-    // If the pixel is black in the dithered image, use the dither color
-    if (dithered.pixels[i] === 0) {
-      coloredDithered.pixels[i] = ditherRGB.r;
-      coloredDithered.pixels[i + 1] = ditherRGB.g;
-      coloredDithered.pixels[i + 2] = ditherRGB.b;
-      coloredDithered.pixels[i + 3] = 255;
-    } else {
-      // Otherwise use the background color
-      coloredDithered.pixels[i] = backgroundRGB.r;
-      coloredDithered.pixels[i + 1] = backgroundRGB.g;
-      coloredDithered.pixels[i + 2] = backgroundRGB.b;
-      coloredDithered.pixels[i + 3] = 255;
-    }
-  }
-  
-  coloredDithered.updatePixels();
-  
-  // Draw the colored dithered image directly (not using Riso)
-  image(coloredDithered, originalWidth * scale, 0, originalWidth * scale, originalHeight * scale);
-  
-  // Draw labels
-  fill(0);
-  textSize(16 * scale);
-  textAlign(CENTER);
-  text("Original Image", originalWidth * scale / 2, 20 * scale);
-  text("Dithered Image", originalWidth * scale + originalWidth * scale / 2, 20 * scale);
-}
-
-function keyReleased() {
-  if (key == '1') {
-    setDitherType('atkinson', 0);
-  }
-  else if (key == '2') {
-    setDitherType('floydsteinberg', 1);
-  }
-  else if (key == '3') {
-    setDitherType('bayer', 2);
-  }
-  else if (key == '4') {
-    setDitherType('none', 3);
-  }
-}
-
-function setDitherType(type, buttonIndex) {
-  ditherType = type;
-  updateDitherButtons(buttonIndex);
-}
-
-function updateDitherButtons(activeIndex) {
-  ditherButtons.forEach((button, index) => {
-    if (index === activeIndex) {
-      button.addClass('active');
-    } else {
-      button.removeClass('active');
-    }
-  });
-}
-
-function updateThresholdValue() {
-  thresholdValue.html(thresholdSlider.value());
-}
-
-function updateDitherColor() {
-  ditherColor = ditherColorPicker.value();
-}
-
-function updateBackgroundColor() {
-  backgroundColor = backgroundColorPicker.value();
-}
-
 function hexToRgb(hex) {
   // Remove the hash if it exists
   hex = hex.replace('#', '');
@@ -261,42 +343,57 @@ function saveDitheredImage() {
     saveButton.style('background-color', '#2196F3');
   }, 200);
   
-  // Create a temporary canvas for the dithered image only
+  // Create a temporary canvas for the processed image
   let tempCanvas = createGraphics(img.width, img.height);
   tempCanvas.background(255);
   
-  // Apply the dithering effect
-  let threshold = thresholdSlider.value();
-  let dithered = ditherImage(img, ditherType, threshold);
+  // Process the image
+  let processed = createGraphics(img.width, img.height);
+  processed.image(img, 0, 0);
+  processed.loadPixels();
   
-  // Apply custom colors
-  let coloredDithered = createGraphics(img.width, img.height);
-  coloredDithered.loadPixels();
-  dithered.loadPixels();
-  
-  // Convert hex colors to RGB
-  let ditherRGB = hexToRgb(ditherColor);
-  let backgroundRGB = hexToRgb(backgroundColor);
-  
-  for (let i = 0; i < dithered.pixels.length; i += 4) {
-    // If the pixel is black in the dithered image, use the dither color
-    if (dithered.pixels[i] === 0) {
-      coloredDithered.pixels[i] = ditherRGB.r;
-      coloredDithered.pixels[i + 1] = ditherRGB.g;
-      coloredDithered.pixels[i + 2] = ditherRGB.b;
-      coloredDithered.pixels[i + 3] = 255;
-    } else {
-      // Otherwise use the background color
-      coloredDithered.pixels[i] = backgroundRGB.r;
-      coloredDithered.pixels[i + 1] = backgroundRGB.g;
-      coloredDithered.pixels[i + 2] = backgroundRGB.b;
-      coloredDithered.pixels[i + 3] = 255;
+  // Apply multi-threshold coloring
+  for (let i = 0; i < processed.pixels.length; i += 4) {
+    const gray = (processed.pixels[i] + processed.pixels[i + 1] + processed.pixels[i + 2]) / 3;
+    
+    // Find the appropriate threshold level
+    let colorIndex = thresholds.length;
+    for (let j = 0; j < thresholds.length; j++) {
+      if (gray <= thresholds[j].level) {
+        colorIndex = j;
+        break;
+      }
     }
+    
+    // Convert hex color to RGB
+    const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
+    
+    // Apply the color
+    processed.pixels[i] = color.r;
+    processed.pixels[i + 1] = color.g;
+    processed.pixels[i + 2] = color.b;
   }
   
-  coloredDithered.updatePixels();
-  tempCanvas.image(coloredDithered, 0, 0);
+  processed.updatePixels();
+  tempCanvas.image(processed, 0, 0);
   
   // Save the temporary canvas
-  saveCanvas(tempCanvas, 'dithered-image', 'png');
+  saveCanvas(tempCanvas, 'processed-image', 'png');
+}
+
+function loadDefaultImage() {
+  // Load a default image for preview
+  img = loadImage('https://picsum.photos/800/400', onImageLoaded);
+}
+
+function isValidHex(hex) {
+  return /^#[0-9A-Fa-f]{6}$/.test(hex);
+}
+
+function updateBackgroundHex() {
+  const hex = backgroundHex.value();
+  if (isValidHex(hex)) {
+    backgroundColor = hex;
+    backgroundColorPicker.value(hex);
+  }
 } 
