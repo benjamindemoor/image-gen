@@ -42,17 +42,127 @@ let thresholds = [
 
 let thresholdCount = 2;
 
+// Settings management
+function saveSettings() {
+  const settings = {
+    backgroundColor,
+    isPixelated,
+    pixelationLevel,
+    thresholds
+  };
+  
+  // Save to localStorage
+  localStorage.setItem('imageGeneratorSettings', JSON.stringify(settings));
+}
+
+function loadSettings() {
+  const savedSettings = localStorage.getItem('imageGeneratorSettings');
+  if (savedSettings) {
+    const settings = JSON.parse(savedSettings);
+    
+    // Apply settings to variables
+    backgroundColor = settings.backgroundColor;
+    isPixelated = settings.isPixelated;
+    pixelationLevel = settings.pixelationLevel;
+    thresholds = settings.thresholds;
+    
+    // Update UI elements if they exist
+    if (backgroundColorPicker) {
+      backgroundColorPicker.value(backgroundColor);
+      backgroundHex.value(backgroundColor);
+    }
+    
+    if (pixelateButton) {
+      pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
+    }
+    
+    if (pixelationSlider) {
+      pixelationSlider.value(pixelationLevel);
+      pixelationValue.html(pixelationLevel);
+    }
+    
+    // Update threshold UI if container exists
+    if (select('#threshold-container')) {
+      updateThresholdUI();
+    }
+  }
+}
+
+function updateThresholdUI() {
+  // Clear existing thresholds
+  const container = select('#threshold-container');
+  container.html('');
+  thresholdCount = thresholds.length;
+  
+  // Create threshold elements for each saved threshold
+  thresholds.forEach((threshold, index) => {
+    const thresholdGroup = createDiv('');
+    thresholdGroup.class('threshold-group');
+    
+    // Create remove button
+    const removeButton = createButton('×');
+    removeButton.class('remove-threshold');
+    removeButton.mousePressed(() => removeThreshold(thresholdGroup, index + 1));
+    
+    // Create label
+    const label = createElement('label', `Threshold ${index + 1}: `);
+    const valueSpan = createSpan(threshold.level);
+    valueSpan.id(`threshold${index + 1}-value`);
+    label.child(valueSpan);
+    label.attribute('for', `threshold${index + 1}-slider`);
+    
+    // Create slider
+    const slider = createInput(threshold.level, 'range');
+    slider.id(`threshold${index + 1}-slider`);
+    slider.class('slider');
+    slider.attribute('min', 0);
+    slider.attribute('max', 255);
+    slider.input(() => updateThresholdValue(index + 1, slider, valueSpan));
+    
+    // Create color option
+    const colorOption = createDiv('');
+    colorOption.class('color-option');
+    
+    const colorLabel = createElement('label', `Color ${index + 1}:`);
+    colorLabel.attribute('for', `threshold${index + 1}-color-picker`);
+    
+    const colorPicker = createInput(threshold.color, 'color');
+    colorPicker.id(`threshold${index + 1}-color-picker`);
+    colorPicker.input(() => updateThresholdColor(index + 1, colorPicker, hexInput));
+    
+    const hexInput = createInput(threshold.color, 'text');
+    hexInput.id(`threshold${index + 1}-hex`);
+    hexInput.class('hex-input');
+    hexInput.attribute('maxlength', 7);
+    hexInput.input(() => updateThresholdHex(index + 1, hexInput, colorPicker));
+    
+    // Assemble the elements
+    colorOption.child(colorLabel);
+    colorOption.child(colorPicker);
+    colorOption.child(hexInput);
+    
+    thresholdGroup.child(removeButton);
+    thresholdGroup.child(label);
+    thresholdGroup.child(slider);
+    thresholdGroup.child(colorOption);
+    
+    container.child(thresholdGroup);
+  });
+}
+
 // Threshold management functions
 function updateThresholdValue(index, slider, valueSpan) {
   const value = parseInt(slider.value());
   valueSpan.html(value);
   thresholds[index - 1].level = value;
+  saveSettings();
 }
 
 function updateThresholdColor(index, colorPicker, hexInput) {
   const color = colorPicker.value();
   thresholds[index - 1].color = color;
   hexInput.value(color);
+  saveSettings();
 }
 
 function updateThresholdHex(index, hexInput, colorPicker) {
@@ -60,6 +170,7 @@ function updateThresholdHex(index, hexInput, colorPicker) {
   if (isValidHex(hex)) {
     thresholds[index - 1].color = hex;
     colorPicker.value(hex);
+    saveSettings();
   }
 }
 
@@ -91,16 +202,19 @@ function updateBackgroundColor() {
   const color = backgroundColorPicker.value();
   backgroundColor = color;
   backgroundHex.value(color);
+  saveSettings();
 }
 
 function updatePixelationLevel() {
   pixelationLevel = parseInt(pixelationSlider.value());
   pixelationValue.html(pixelationLevel);
+  saveSettings();
 }
 
 function togglePixelation() {
   isPixelated = !isPixelated;
   pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
+  saveSettings();
 }
 
 function addNewThreshold() {
@@ -182,11 +296,11 @@ function removeThreshold(thresholdGroup, index) {
 function setup() {
   pixelDensity(1);
   
-  // Create canvas with initial size - only once
+  // Create canvas with initial size
   canvas = createCanvas(800, 800);
   canvas.parent('canvas-container');
   
-  // Get DOM elements
+  // Get DOM elements first
   threshold1Slider = select('#threshold1-slider');
   threshold1Value = select('#threshold1-value');
   threshold1ColorPicker = select('#threshold1-color-picker');
@@ -219,14 +333,14 @@ function setup() {
   pixelationSlider.input(updatePixelationLevel);
   pixelateButton.mousePressed(togglePixelation);
   
-  // Set initial state of pixelation button
-  pixelateButton.class(isPixelated ? 'effect-button active' : 'effect-button');
-  
   // Add threshold button listener
   select('#add-threshold').mousePressed(addNewThreshold);
   
   // Add window resize event listener
   window.addEventListener('resize', handleResize);
+  
+  // Load saved settings after DOM elements are created
+  loadSettings();
   
   // Load default image
   loadDefaultImage();
@@ -377,6 +491,7 @@ function onImageLoaded() {
   if (processedGraphics) {
     processedGraphics.remove();
   }
+  
   if (pixelatedGraphics) {
     pixelatedGraphics.remove();
   }
@@ -430,93 +545,68 @@ function saveDitheredImage() {
     saveButton.style('background-color', '#2196F3');
   }, 200);
   
-  // Use existing graphics objects for saving
-  let saveCanvas = createGraphics(img.width, img.height);
+  // Create a temporary canvas for the processed image
+  let tempCanvas = createGraphics(img.width, img.height);
+  tempCanvas.background(255);
   
-  // Process using existing graphics objects
+  // Process the image
+  let processed = createGraphics(img.width, img.height);
+  processed.image(img, 0, 0);
+  
   if (isPixelated) {
-    // Apply pixelation using the existing pixelatedGraphics
-    processedGraphics.loadPixels();
-    pixelatedGraphics.clear();
-    pixelatedGraphics.background(255);
+    // Apply pixelation
+    processed.loadPixels();
+    let pixelated = createGraphics(img.width, img.height);
+    pixelated.background(255);
     
-    for (let x = 0; x < processedGraphics.width; x += pixelationLevel) {
-      for (let y = 0; y < processedGraphics.height; y += pixelationLevel) {
+    for (let x = 0; x < processed.width; x += pixelationLevel) {
+      for (let y = 0; y < processed.height; y += pixelationLevel) {
         // Get the color at this pixel
-        let i = (x + y * processedGraphics.width) * 4;
-        let r = processedGraphics.pixels[i];
-        let g = processedGraphics.pixels[i + 1];
-        let b = processedGraphics.pixels[i + 2];
-        let a = processedGraphics.pixels[i + 3];
+        let i = (x + y * processed.width) * 4;
+        let r = processed.pixels[i];
+        let g = processed.pixels[i + 1];
+        let b = processed.pixels[i + 2];
+        let a = processed.pixels[i + 3];
         
         // Fill the pixel block with the sampled color
-        pixelatedGraphics.fill(r, g, b, a);
-        pixelatedGraphics.noStroke();
-        pixelatedGraphics.rect(x, y, pixelationLevel, pixelationLevel);
+        pixelated.fill(r, g, b, a);
+        pixelated.noStroke();
+        pixelated.rect(x, y, pixelationLevel, pixelationLevel);
       }
     }
     
-    pixelatedGraphics.loadPixels();
-    
-    // Apply multi-threshold coloring to pixelated image
-    for (let i = 0; i < pixelatedGraphics.pixels.length; i += 4) {
-      const gray = (pixelatedGraphics.pixels[i] + pixelatedGraphics.pixels[i + 1] + pixelatedGraphics.pixels[i + 2]) / 3;
-      
-      // Find the appropriate threshold level
-      let colorIndex = thresholds.length;
-      for (let j = 0; j < thresholds.length; j++) {
-        if (gray <= thresholds[j].level) {
-          colorIndex = j;
-          break;
-        }
-      }
-      
-      // Convert hex color to RGB
-      const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
-      
-      // Apply the color
-      pixelatedGraphics.pixels[i] = color.r;
-      pixelatedGraphics.pixels[i + 1] = color.g;
-      pixelatedGraphics.pixels[i + 2] = color.b;
-    }
-    
-    pixelatedGraphics.updatePixels();
-    saveCanvas.image(pixelatedGraphics, 0, 0);
-  } else {
-    // Apply thresholds directly to processed image
-    processedGraphics.loadPixels();
-    
-    // Apply multi-threshold coloring
-    for (let i = 0; i < processedGraphics.pixels.length; i += 4) {
-      const gray = (processedGraphics.pixels[i] + processedGraphics.pixels[i + 1] + processedGraphics.pixels[i + 2]) / 3;
-      
-      // Find the appropriate threshold level
-      let colorIndex = thresholds.length;
-      for (let j = 0; j < thresholds.length; j++) {
-        if (gray <= thresholds[j].level) {
-          colorIndex = j;
-          break;
-        }
-      }
-      
-      // Convert hex color to RGB
-      const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
-      
-      // Apply the color
-      processedGraphics.pixels[i] = color.r;
-      processedGraphics.pixels[i + 1] = color.g;
-      processedGraphics.pixels[i + 2] = color.b;
-    }
-    
-    processedGraphics.updatePixels();
-    saveCanvas.image(processedGraphics, 0, 0);
+    processed = pixelated;
   }
   
-  // Save the image
-  saveCanvas.save('processed-image');
+  processed.loadPixels();
   
-  // Clean up the temporary canvas
-  saveCanvas.remove();
+  // Apply multi-threshold coloring
+  for (let i = 0; i < processed.pixels.length; i += 4) {
+    const gray = (processed.pixels[i] + processed.pixels[i + 1] + processed.pixels[i + 2]) / 3;
+    
+    // Find the appropriate threshold level
+    let colorIndex = thresholds.length;
+    for (let j = 0; j < thresholds.length; j++) {
+      if (gray <= thresholds[j].level) {
+        colorIndex = j;
+        break;
+      }
+    }
+    
+    // Convert hex color to RGB
+    const color = hexToRgb(colorIndex < thresholds.length ? thresholds[colorIndex].color : backgroundColor);
+    
+    // Apply the color
+    processed.pixels[i] = color.r;
+    processed.pixels[i + 1] = color.g;
+    processed.pixels[i + 2] = color.b;
+  }
+  
+  processed.updatePixels();
+  tempCanvas.image(processed, 0, 0);
+  
+  // Save the temporary canvas
+  saveCanvas(tempCanvas, 'processed-image', 'png');
 }
 
 function loadDefaultImage() {
