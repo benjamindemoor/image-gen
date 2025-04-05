@@ -33,6 +33,7 @@ let pixelateButton;
 let pixelationSlider;
 let pixelationValue;
 let pixelationControl;
+let randomButton;
 
 // Threshold configuration
 let thresholds = [
@@ -41,6 +42,68 @@ let thresholds = [
 ];
 
 let thresholdCount = 2;
+
+// Random color generator
+function getRandomColor() {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}
+
+// Random threshold generator
+function generateRandomThresholds() {
+  // Generate random number of thresholds (2-4)
+  const numThresholds = Math.floor(Math.random() * 3) + 2;
+  const newThresholds = [];
+  
+  // Generate random values ensuring each is higher than the previous
+  let lastValue = 0;
+  for (let i = 0; i < numThresholds; i++) {
+    // Calculate range for this threshold
+    const minValue = lastValue + 20; // Ensure minimum gap of 20
+    const maxValue = 255 - (numThresholds - i - 1) * 20; // Leave room for remaining thresholds
+    
+    // Generate random value within range
+    const value = Math.floor(Math.random() * (maxValue - minValue + 1)) + minValue;
+    lastValue = value;
+    
+    // Add threshold with random color
+    newThresholds.push({
+      level: value,
+      color: getRandomColor()
+    });
+  }
+  
+  return newThresholds;
+}
+
+// Randomize all settings
+function randomizeSettings() {
+  // Randomize pixelation
+  isPixelated = true;
+  pixelationLevel = Math.floor(Math.random() * 3) + 3; // Random between 3-5
+  pixelationSlider.value(pixelationLevel);
+  pixelationValue.html(pixelationLevel);
+  pixelateButton.class('effect-button active');
+  
+  // Randomize background color
+  backgroundColor = getRandomColor();
+  backgroundColorPicker.value(backgroundColor);
+  backgroundHex.value(backgroundColor);
+  
+  // Generate and apply random thresholds
+  thresholds = generateRandomThresholds();
+  thresholdCount = thresholds.length;
+  
+  // Update threshold UI
+  updateThresholdUI();
+  
+  // Save settings
+  saveSettings();
+}
 
 // Settings management
 function saveSettings() {
@@ -300,7 +363,7 @@ function setup() {
   canvas = createCanvas(800, 800);
   canvas.parent('canvas-container');
   
-  // Get DOM elements first
+  // Get DOM elements
   threshold1Slider = select('#threshold1-slider');
   threshold1Value = select('#threshold1-value');
   threshold1ColorPicker = select('#threshold1-color-picker');
@@ -318,6 +381,7 @@ function setup() {
   pixelationSlider = select('#pixelation-slider');
   pixelationValue = select('#pixelation-value');
   pixelationControl = select('#pixelation-control');
+  randomButton = select('#random-btn');
   
   // Set up event listeners
   threshold1Slider.input(updateThreshold1Value);
@@ -332,6 +396,7 @@ function setup() {
   imageUpload.input(handleFileUpload);
   pixelationSlider.input(updatePixelationLevel);
   pixelateButton.mousePressed(togglePixelation);
+  randomButton.mousePressed(randomizeSettings);
   
   // Add threshold button listener
   select('#add-threshold').mousePressed(addNewThreshold);
