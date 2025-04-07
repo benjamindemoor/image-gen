@@ -3,92 +3,351 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Image Posterization Generator</title>
+    <title>Image Generator</title>
     <link rel="stylesheet" href="style.css">
     <!-- p5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="sketch.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            background-color: #000000;
+            color: #fff;
+            display: flex;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            background-color: #000000;
+        }
+
+        #canvas-container canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #controls {
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 300px;
+            background-color: #000;
+            padding: 20px;
+            border-left: 1px solid #fff;
+            box-shadow: -5px 0 15px rgba(255, 255, 255, 0.2);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #fff;
+            padding-bottom: 10px;
+        }
+
+        .control-group:last-child {
+            border-bottom: none;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            background-color: #fff;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 25px;
+            border: 1px solid #fff;
+            background-color: #000;
+        }
+
+        input[type="text"] {
+            width: 70px;
+            padding: 5px;
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: #fff;
+            color: #000;
+        }
+
+        .effect-button {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .effect-button.active {
+            background-color: #fff;
+            color: #000;
+        }
+
+        #loading-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2;
+            background-color: #000000;
+        }
+
+        #loading-text {
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #FFFFFF;
+        }
+
+        .color-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #fff;
+            cursor: pointer;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+
+        .threshold-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #fff;
+        }
+
+        .remove-threshold {
+            float: right;
+            background: none;
+            border: none;
+            color: #f00;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .remove-threshold:hover {
+            color: #ff0;
+        }
+
+        .swap-colors {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .swap-colors:hover {
+            color: #ccc;
+        }
+
+        #palette-container {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        #settings-container {
+            margin-top: 20px;
+        }
+
+        #settings-name {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        #saved-settings {
+            width: 100%;
+            margin-bottom: 10px;
+            background-color: #000;
+            color: #fff;
+            border: 1px solid #fff;
+            padding: 5px;
+        }
+
+        #settings-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        #settings-buttons button {
+            flex: 1;
+        }
+
+        /* Scrollbar styling */
+        #controls::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #controls::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        #controls::-webkit-scrollbar-thumb {
+            background: #fff;
+            border-radius: 4px;
+        }
+
+        #controls::-webkit-scrollbar-thumb:hover {
+            background: #ccc;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+        }
+
+        input[type="file"]::-webkit-file-upload-button {
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+
+        input[type="file"]::-webkit-file-upload-button:hover {
+            background-color: #fff;
+            color: #000;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Image Posterization Generator</h1>
-            <button id="random-btn" class="effect-button">Randomize</button>
-        </header>
-        
-        <div class="upload-section">
-            <h3>Upload Your Image</h3>
-            <div class="file-upload">
-                <input type="file" id="image-upload" accept="image/*">
-                <label for="image-upload" class="upload-button">Choose Image</label>
-                <span id="file-name">No file chosen</span>
-            </div>
-            <p class="upload-hint">Supported formats: JPG, PNG, GIF</p>
+    <div id="canvas-container">
+        <div id="loading-screen">
+            <div id="loading-text">Loading</div>
         </div>
-        
-        <div class="main-content">
-            <div class="canvas-section">
-                <div id="canvas-container"></div>
+    </div>
+    <div id="controls">
+        <div class="controls-panel">
+            <h2>Image Controls</h2>
+            
+            <div class="controls-section">
+                <h3>Actions</h3>
+                <div class="control-group">
+                    <button id="random-btn" class="action-button">Randomize</button>
+                    <button id="save-btn" class="action-button">Save Image</button>
+                </div>
             </div>
             
-            <div class="control-panel">
-                <div class="control-section">
-                    <h3>Thresholds</h3>
-                    <div class="threshold-controls" id="threshold-container">
-                        <div class="threshold-group">
-                            <label for="threshold1-slider">Threshold 1: <span id="threshold1-value">128</span></label>
-                            <input type="range" id="threshold1-slider" min="0" max="255" value="128" class="slider">
-                            <div class="color-option">
-                                <label for="threshold1-color-picker">Color 1:</label>
-                                <input type="color" id="threshold1-color-picker" value="#000000">
-                                <input type="text" id="threshold1-hex" value="#000000" class="hex-input" maxlength="7">
-                            </div>
-                        </div>
-                        <div class="threshold-group">
-                            <label for="threshold2-slider">Threshold 2: <span id="threshold2-value">200</span></label>
-                            <input type="range" id="threshold2-slider" min="0" max="255" value="200" class="slider">
-                            <div class="color-option">
-                                <label for="threshold2-color-picker">Color 2:</label>
-                                <input type="color" id="threshold2-color-picker" value="#666666">
-                                <input type="text" id="threshold2-hex" value="#666666" class="hex-input" maxlength="7">
-                            </div>
-                        </div>
-                    </div>
-                    <button id="add-threshold" class="add-button">Add Threshold</button>
+            <div class="controls-section">
+                <h3>Image</h3>
+                <div class="control-group">
+                    <button id="new-image-btn" class="action-button">New Image</button>
+                    <input type="file" id="image-upload" accept="image/*">
+                    <span id="file-name">No file selected</span>
                 </div>
-                
-                <div class="control-section">
-                    <h3>Background Color</h3>
-                    <div class="color-controls">
-                        <div class="color-option">
-                            <label for="background-color-picker">Background:</label>
-                            <input type="color" id="background-color-picker" value="#FFFFFF">
-                            <input type="text" id="background-hex" value="#FFFFFF" class="hex-input" maxlength="7">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-section">
-                    <h3>Effects</h3>
-                    <button id="pixelate-btn" class="effect-button active">Pixelate</button>
-                    <div id="pixelation-control" class="pixelation-control">
-                        <label for="pixelation-slider">Pixelation Level: <span id="pixelation-value">10</span></label>
-                        <input type="range" id="pixelation-slider" min="1" max="20" value="10" class="slider">
-                    </div>
-                </div>
-                
-                <button id="save-btn" class="save-button">Save Processed Image</button>
             </div>
-        </div>
-        
-        <div class="info-panel">
-            <h3>How to Use</h3>
-            <div class="info-content">
-                <p>1. Upload an image using the file upload button</p>
-                <p>2. Adjust the threshold levels using the sliders</p>
-                <p>3. Choose colors for each threshold level</p>
-                <p>4. Select a background color</p>
-                <p>5. Click "Save Processed Image" to download the result</p>
+            
+            <div class="controls-section">
+                <h3>Settings</h3>
+                <div class="control-group">
+                    <input type="text" id="settings-name" placeholder="Settings name">
+                    <button id="save-settings-btn">Save Settings</button>
+                    <select id="saved-settings">
+                        <option value="">Load saved settings...</option>
+                    </select>
+                    <button id="delete-settings-btn">Delete Settings</button>
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <h3>Background</h3>
+                <div class="control-group">
+                    <label for="background-color-picker">Background Color:</label>
+                    <input type="color" id="background-color-picker" value="#000000">
+                    <input type="text" id="background-hex" class="hex-input" value="#000000" maxlength="7">
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <h3>Thresholds</h3>
+                <div id="threshold-container">
+                    <!-- Threshold controls will be added here -->
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <h3>Effects</h3>
+                <div class="control-group">
+                    <button id="pixelate-btn" class="effect-button">Pixelate</button>
+                    <div class="slider-container">
+                        <input type="range" id="pixelation-slider" min="2" max="32" value="8">
+                        <span id="pixelation-value">8</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="stroke-checkbox">
+                        Stroke
+                    </label>
+                    <div class="color-option">
+                        <input type="color" id="stroke-color-picker" value="#000000">
+                        <input type="text" id="stroke-hex" class="hex-input" value="#000000" maxlength="7">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="vertical-stripes-checkbox" checked>
+                        Vertical Stripes
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="horizontal-stripes-checkbox" checked>
+                        Horizontal Stripes
+                    </label>
+                </div>
             </div>
         </div>
     </div>

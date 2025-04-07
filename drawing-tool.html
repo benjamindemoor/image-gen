@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Drawing Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background-color: #333;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-links a {
+            color: #ffffff;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a:hover {
+            background-color: #444;
+        }
+
+        .nav-links a.active {
+            background-color: #666;
+        }
+
+        .main-content {
+            margin-top: 60px;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            position: fixed;
+            right: 20px;
+            top: 80px;
+            width: 300px;
+            background-color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+        }
+
+        .slider-container span {
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            background-color: #1976D2;
+        }
+
+        .button:active {
+            background-color: #0D47A1;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .file-label:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="nav-links">
+            <a href="index.html">Image Generator</a>
+            <a href="drawing-tool.html" class="active">Drawing Tool</a>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="canvas-container" id="canvas-container"></div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <h3>Images</h3>
+                <label class="file-label">
+                    Load Images
+                    <input type="file" class="file-input" id="image-upload" multiple accept="image/*,.svg">
+                </label>
+            </div>
+
+            <div class="control-group">
+                <h3>Drawing</h3>
+                <div class="slider-container">
+                    <label>Rotation Speed:</label>
+                    <input type="range" id="rotation-speed" min="0" max="10" value="5">
+                    <span id="rotation-value">5</span>
+                </div>
+                <div class="slider-container">
+                    <label>Pulse Speed:</label>
+                    <input type="range" id="pulse-speed" min="0" max="10" value="5">
+                    <span id="pulse-value">5</span>
+                </div>
+                <div class="slider-container">
+                    <label>Size:</label>
+                    <input type="range" id="size-slider" min="10" max="200" value="100">
+                    <span id="size-value">100</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Effects</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="stroke-checkbox">
+                    <label for="stroke-checkbox">Stroke</label>
+                </div>
+                <div class="slider-container">
+                    <label>Pixelation:</label>
+                    <input type="range" id="pixelation-slider" min="1" max="32" value="1">
+                    <span id="pixelation-value">1</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button class="button" id="save-btn">Save Drawing</button>
+                <button class="button" id="clear-btn">Clear Canvas</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="drawing-tool.js"></script>
+</body>
+</html> 
