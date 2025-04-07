@@ -1,21 +1,23 @@
+// Drawing tool variables
 let canvas;
-let drawingImages = [];
+let images = []; // Array to store uploaded images
 let currentImageIndex = 0;
-let lastDrawTime = 0;
-let autoCycleInterval = 5000; // 5 seconds default
+let lastImageChange = 0;
+let autoCycleInterval = 5000; // 5 seconds
 let rotationSpeed = 5;
-let pulseSpeed = 5;
-let baseSize = 100;
+let imageSize = 50;
 let hasStroke = false;
 let pixelationLevel = 1;
-let drawings = [];
+let rotationAngle = 0;
+
+// Default brush image
+let brushImage;
+let isUsingBrush = true;
 
 // DOM elements
 let imageUpload;
 let rotationSpeedSlider;
 let rotationValue;
-let pulseSpeedSlider;
-let pulseValue;
 let sizeSlider;
 let sizeValue;
 let strokeCheckbox;
@@ -23,14 +25,30 @@ let pixelationSlider;
 let pixelationValue;
 let saveButton;
 let clearButton;
+let imageSelect;
+
+function preload() {
+    // Load the default brush image
+    brushImage = loadImage("data/images/paint.png");
+}
 
 function setup() {
     // Set frame rate
     frameRate(50);
     
-    // Create canvas
-    canvas = createCanvas(1169, 1653);
-    canvas.parent('canvas-container');
+    // Create canvas with a specific size
+    canvas = createCanvas(windowWidth - 300, windowHeight - 60); // Account for controls panel and header
+    
+    // Make sure the canvas is added to the correct container
+    const canvasContainer = select('#canvas-container');
+    if (canvasContainer) {
+        canvas.parent('canvas-container');
+        // Set canvas style
+        canvas.style('display', 'block');
+        canvas.style('margin', 'auto');
+    } else {
+        console.error('Canvas container not found!');
+    }
     
     // Set background
     background(255);
@@ -39,8 +57,6 @@ function setup() {
     imageUpload = select('#image-upload');
     rotationSpeedSlider = select('#rotation-speed');
     rotationValue = select('#rotation-value');
-    pulseSpeedSlider = select('#pulse-speed');
-    pulseValue = select('#pulse-value');
     sizeSlider = select('#size-slider');
     sizeValue = select('#size-value');
     strokeCheckbox = select('#stroke-checkbox');
@@ -48,128 +64,142 @@ function setup() {
     pixelationValue = select('#pixelation-value');
     saveButton = select('#save-btn');
     clearButton = select('#clear-btn');
+    imageSelect = select('#image-select');
     
     // Set up event listeners
     imageUpload.input(handleImageUpload);
     rotationSpeedSlider.input(updateRotationSpeed);
-    pulseSpeedSlider.input(updatePulseSpeed);
     sizeSlider.input(updateSize);
     strokeCheckbox.changed(toggleStroke);
     pixelationSlider.input(updatePixelation);
     saveButton.mousePressed(saveDrawing);
     clearButton.mousePressed(clearCanvas);
+    imageSelect.changed(selectImage);
+    
+    // Initialize UI values
+    updateUIValues();
 }
 
 function draw() {
-    // Clear the canvas
-    background(255);
+    // Update rotation angle
+    rotationAngle += rotationSpeed * 0.01;
     
-    // Draw all existing drawings
-    for (let drawing of drawings) {
+    // Auto-cycle images every 5 seconds if we have images loaded
+    if (images.length > 0) {
+        let currentTime = millis();
+        if (currentTime - lastImageChange > autoCycleInterval) {
+            currentImageIndex = (currentImageIndex + 1) % images.length;
+            lastImageChange = currentTime;
+        }
+    }
+    
+    // Show brush preview at mouse position when not drawing
+    if (isUsingBrush && mouseX > 0 && mouseY > 0 && mouseX < width && mouseY < height) {
         push();
-        translate(drawing.x, drawing.y);
-        rotate(drawing.rotation);
+        imageMode(CENTER);
         
-        // Apply pulse effect
-        const pulse = sin(frameCount * 0.01 * drawing.pulseSpeed) * 0.2 + 1;
-        const size = drawing.baseSize * pulse;
+        // Draw semi-transparent brush preview
+        tint(255, 128); // Semi-transparent
+        translate(mouseX, mouseY);
+        rotate(rotationAngle);
+        noTint();
+        pop();
         
-        // Apply pixelation if enabled
-        if (drawing.pixelationLevel > 1) {
-            drawing.image.loadPixels();
-            const temp = createImage(drawing.image.width, drawing.image.height);
-            temp.copy(drawing.image, 0, 0, drawing.image.width, drawing.image.height, 0, 0, drawing.image.width, drawing.image.height);
-            
-            for (let y = 0; y < temp.height; y += drawing.pixelationLevel) {
-                for (let x = 0; x < temp.width; x += drawing.pixelationLevel) {
-                    const i = (x + y * temp.width) * 4;
-                    const r = temp.pixels[i];
-                    const g = temp.pixels[i + 1];
-                    const b = temp.pixels[i + 2];
-                    
-                    for (let py = 0; py < drawing.pixelationLevel && y + py < temp.height; py++) {
-                        for (let px = 0; px < drawing.pixelationLevel && x + px < temp.width; px++) {
-                            const pi = (x + px + (y + py) * temp.width) * 4;
-                            temp.pixels[pi] = r;
-                            temp.pixels[pi + 1] = g;
-                            temp.pixels[pi + 2] = b;
-                        }
+        if (mouseIsPressed) {
+            drawBrush();
+        }   
+    }
+}
+
+function drawBrush() {
+    push();
+    imageMode(CENTER);
+    
+    // Create a temporary graphics buffer for pixelation
+    let tempGraphics = createGraphics(imageSize, imageSize);
+    
+    // Draw the brush image to the temporary buffer
+    tempGraphics.imageMode(CENTER);
+    tempGraphics.translate(imageSize/2, imageSize/2);
+    tempGraphics.rotate(rotationAngle);
+    tempGraphics.image(brushImage, 0, 0, imageSize, imageSize);
+    
+    // Apply pixelation if enabled
+    if (pixelationLevel > 1) {
+        tempGraphics.loadPixels();
+        for (let y = 0; y < imageSize; y += pixelationLevel) {
+            for (let x = 0; x < imageSize; x += pixelationLevel) {
+                let i = (x + y * imageSize) * 4;
+                let r = tempGraphics.pixels[i];
+                let g = tempGraphics.pixels[i + 1];
+                let b = tempGraphics.pixels[i + 2];
+                let a = tempGraphics.pixels[i + 3];
+                
+                for (let py = 0; py < pixelationLevel && y + py < imageSize; py++) {
+                    for (let px = 0; px < pixelationLevel && x + px < imageSize; px++) {
+                        let pi = (x + px + (y + py) * imageSize) * 4;
+                        tempGraphics.pixels[pi] = r;
+                        tempGraphics.pixels[pi + 1] = g;
+                        tempGraphics.pixels[pi + 2] = b;
+                        tempGraphics.pixels[pi + 3] = a;
                     }
                 }
             }
-            
-            temp.updatePixels();
-            image(temp, -size/2, -size/2, size, size);
-            temp.remove();
-        } else {
-            image(drawing.image, -size/2, -size/2, size, size);
         }
-        
-        // Apply stroke if enabled
-        if (drawing.hasStroke) {
-            stroke(0);
-            strokeWeight(2);
-            noFill();
-            rect(-size/2, -size/2, size, size);
-        }
-        
-        pop();
+        tempGraphics.updatePixels();
     }
     
-    // Auto-cycle through images when drawing
-    if (mouseIsPressed && drawingImages.length > 0) {
-        const currentTime = millis();
-        if (currentTime - lastDrawTime >= autoCycleInterval) {
-            currentImageIndex = (currentImageIndex + 1) % drawingImages.length;
-            lastDrawTime = currentTime;
-        }
-    }
-}
-
-function mouseDragged() {
-    if (drawingImages.length > 0) {
-        // Create new drawing
-        const drawing = {
-            image: drawingImages[currentImageIndex],
-            x: mouseX,
-            y: mouseY,
-            rotation: frameCount * 0.01 * rotationSpeed,
-            pulseSpeed: pulseSpeed,
-            baseSize: baseSize,
-            hasStroke: hasStroke,
-            pixelationLevel: pixelationLevel
-        };
-        
-        drawings.push(drawing);
-    }
+    // Draw the processed image to the canvas
+    image(tempGraphics, mouseX, mouseY);
+    
+    // Clean up
+    tempGraphics.remove();
+    pop();
 }
 
 function handleImageUpload() {
-    const files = imageUpload.elt.files;
-    for (let file of files) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = loadImage(event.target.result, () => {
-                drawingImages.push(img);
-            });
-        };
-        reader.readAsDataURL(file);
+    if (imageUpload.elt.files.length > 0) {
+        const files = imageUpload.elt.files;
+        images = []; // Clear existing images
+        
+        // Clear and update image select dropdown
+        imageSelect.html('<option value="default">Default Brush</option>');
+        
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                const img = loadImage(event.target.result, function() {
+                    images.push(img);
+                    // Add option to select dropdown
+                    imageSelect.option(`Image ${images.length}`, images.length - 1);
+                });
+            };
+            
+            reader.readAsDataURL(file);
+        }
+    }
+}
+
+function selectImage() {
+    const selectedIndex = parseInt(imageSelect.value());
+    if (selectedIndex >= 0 && selectedIndex < images.length) {
+        brushImage = images[selectedIndex];
+    } else {
+        // Reset to default brush
+        brushImage = loadImage("data/images/paint.png");
     }
 }
 
 function updateRotationSpeed() {
-    rotationSpeed = rotationSpeedSlider.value();
+    rotationSpeed = parseInt(rotationSpeedSlider.value());
     rotationValue.html(rotationSpeed);
 }
 
-function updatePulseSpeed() {
-    pulseSpeed = pulseSpeedSlider.value();
-    pulseValue.html(pulseSpeed);
-}
-
 function updateSize() {
-    baseSize = sizeSlider.value();
-    sizeValue.html(baseSize);
+    imageSize = parseInt(sizeSlider.value());
+    sizeValue.html(imageSize);
 }
 
 function toggleStroke() {
@@ -177,29 +207,38 @@ function toggleStroke() {
 }
 
 function updatePixelation() {
-    pixelationLevel = pixelationSlider.value();
+    pixelationLevel = parseInt(pixelationSlider.value());
     pixelationValue.html(pixelationLevel);
 }
 
-function generateRandomName() {
-    const adjectives = ['Cool', 'Awesome', 'Great', 'Amazing', 'Fantastic', 'Super', 'Epic', 'Incredible'];
-    const nouns = ['Drawing', 'Art', 'Creation', 'Design', 'Work', 'Piece', 'Masterpiece', 'Sketch'];
-    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-    return `${randomAdjective}${randomNoun}`;
-}
-
 function saveDrawing() {
-    const randomName = generateRandomName();
-    const category = 'drawing';
-    const date = new Date();
-    const dateStr = date.toISOString().split('T')[0];
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const filename = `${randomName}_${category}_${dateStr}_${seconds}.png`;
+    // Generate filename with random name, category, date, and seconds
+    const filename = generateFilename();
     saveCanvas(canvas, filename, 'png');
 }
 
 function clearCanvas() {
-    drawings = [];
     background(255);
+}
+
+function updateUIValues() {
+    rotationValue.html(rotationSpeed);
+    sizeValue.html(imageSize);
+    pixelationValue.html(pixelationLevel);
+}
+
+function generateFilename() {
+    const adjectives = ['Cool', 'Awesome', 'Great', 'Amazing', 'Fantastic', 'Super', 'Epic', 'Incredible'];
+    const nouns = ['Image', 'Art', 'Creation', 'Design', 'Work', 'Piece', 'Masterpiece', 'Photo'];
+    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+    const date = new Date();
+    const dateStr = date.toISOString().split('T')[0];
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${randomAdjective}${randomNoun}_drawing_${dateStr}_${seconds}.png`;
+}
+
+// Add window resize handler
+function windowResized() {
+    resizeCanvas(windowWidth - 300, windowHeight - 60);
 } 

@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Drawing Tool</title>
+    <title>Drawing Tool</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <script src="drawing-tool.js"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #1a1a1a;
+            background-color: #000000;
             color: #ffffff;
-            overflow-x: hidden;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
         }
 
         .header {
@@ -24,27 +24,27 @@
             height: 60px;
             background-color: #333;
             display: flex;
+            justify-content: center;
             align-items: center;
-            padding: 0 20px;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 100;
         }
 
         .nav-links {
             display: flex;
             gap: 20px;
+            justify-content: center;
         }
 
         .nav-links a {
             color: #ffffff;
             text-decoration: none;
-            padding: 10px;
+            padding: 10px 20px;
             border-radius: 4px;
             transition: background-color 0.3s;
         }
 
         .nav-links a:hover {
-            background-color: #444;
+            background-color: #555;
         }
 
         .nav-links a.active {
@@ -52,38 +52,44 @@
         }
 
         .main-content {
+            display: flex;
             margin-top: 60px;
-            padding: 20px;
-            position: relative;
-            z-index: 1;
+            height: calc(100vh - 60px);
         }
 
         .canvas-container {
+            flex: 1;
             display: flex;
             justify-content: center;
+            align-items: center;
+            background-color: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls-panel {
+            width: 300px;
+            background-color: #222;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 1px solid #444;
+        }
+
+        .controls-section {
             margin-bottom: 20px;
         }
 
-        .controls {
-            position: fixed;
-            right: 20px;
-            top: 80px;
-            width: 300px;
-            background-color: #333;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            z-index: 100;
+        .controls-section h3 {
+            color: #fff;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
         }
 
         .control-group {
-            margin-bottom: 15px;
-        }
-
-        .control-group h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .slider-container {
@@ -92,117 +98,154 @@
             gap: 10px;
         }
 
-        .slider-container input[type="range"] {
+        .slider-container label {
+            min-width: 100px;
+            color: #fff;
+        }
+
+        input[type="range"] {
             flex: 1;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            outline: none;
         }
 
-        .slider-container span {
-            min-width: 40px;
-            text-align: right;
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
         }
 
-        .checkbox-group {
+        .button-group {
             display: flex;
-            align-items: center;
             gap: 10px;
+            margin-top: 10px;
         }
 
-        .button {
-            background-color: #2196F3;
-            color: white;
+        button {
+            background-color: #333;
+            color: #fff;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
+            font-family: 'Courier New', monospace;
             transition: background-color 0.3s;
         }
 
-        .button:hover {
-            background-color: #1976D2;
+        button:hover {
+            background-color: #444;
         }
 
-        .button:active {
-            background-color: #0D47A1;
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .file-label {
-            display: inline-block;
-            background-color: #2196F3;
-            color: white;
-            padding: 10px 20px;
+        .effect-button {
+            background-color: #333;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
+            font-family: 'Courier New', monospace;
             transition: background-color 0.3s;
         }
 
-        .file-label:hover {
-            background-color: #1976D2;
+        .effect-button.active {
+            background-color: #666;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #222;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="nav-links">
-            <a href="index.html">Image Generator</a>
+            <a href="index.html">Home</a>
             <a href="drawing-tool.html" class="active">Drawing Tool</a>
         </div>
     </div>
 
     <div class="main-content">
-        <div class="canvas-container" id="canvas-container"></div>
-        
-        <div class="controls">
-            <div class="control-group">
-                <h3>Images</h3>
-                <label class="file-label">
-                    Load Images
-                    <input type="file" class="file-input" id="image-upload" multiple accept="image/*,.svg">
-                </label>
-            </div>
+        <div class="canvas-container" id="canvas-container">
+            <!-- Canvas will be created here by p5.js -->
+        </div>
 
-            <div class="control-group">
-                <h3>Drawing</h3>
-                <div class="slider-container">
-                    <label>Rotation Speed:</label>
-                    <input type="range" id="rotation-speed" min="0" max="10" value="5">
-                    <span id="rotation-value">5</span>
-                </div>
-                <div class="slider-container">
-                    <label>Pulse Speed:</label>
-                    <input type="range" id="pulse-speed" min="0" max="10" value="5">
-                    <span id="pulse-value">5</span>
-                </div>
-                <div class="slider-container">
-                    <label>Size:</label>
-                    <input type="range" id="size-slider" min="10" max="200" value="100">
-                    <span id="size-value">100</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <h3>Effects</h3>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="stroke-checkbox">
-                    <label for="stroke-checkbox">Stroke</label>
-                </div>
-                <div class="slider-container">
-                    <label>Pixelation:</label>
-                    <input type="range" id="pixelation-slider" min="1" max="32" value="1">
-                    <span id="pixelation-value">1</span>
+        <div class="controls-panel">
+            <div class="controls-section">
+                <h3>Drawing Effects</h3>
+                <div class="control-group">
+                    <div class="slider-container">
+                        <label for="rotation-speed">Rotation Speed:</label>
+                        <input type="range" id="rotation-speed" min="0" max="10" value="5">
+                        <span id="rotation-value">5</span>
+                    </div>
+                    <div class="slider-container">
+                        <label for="size-slider">Size:</label>
+                        <input type="range" id="size-slider" min="10" max="200" value="100">
+                        <span id="size-value">100</span>
+                    </div>
+                    <div class="slider-container">
+                        <label for="pixelation-slider">Pixelation:</label>
+                        <input type="range" id="pixelation-slider" min="1" max="20" value="1">
+                        <span id="pixelation-value">1</span>
+                    </div>
+                    <div class="slider-container">
+                        <label for="stroke-checkbox">Stroke:</label>
+                        <input type="checkbox" id="stroke-checkbox">
+                    </div>
                 </div>
             </div>
 
-            <div class="control-group">
-                <button class="button" id="save-btn">Save Drawing</button>
-                <button class="button" id="clear-btn">Clear Canvas</button>
+            <div class="controls-section">
+                <h3>Image Controls</h3>
+                <div class="control-group">
+                    <div class="slider-container">
+                        <label for="image-upload">Upload Images:</label>
+                        <input type="file" id="image-upload" accept="image/*" multiple>
+                    </div>
+                    <div class="slider-container">
+                        <label for="image-select">Select Image:</label>
+                        <select id="image-select">
+                            <option value="default">Default Brush</option>
+                        </select>
+                    </div>
+                    <div class="slider-container">
+                        <label for="size-slider">Size: <span id="size-value">50</span></label>
+                        <input type="range" id="size-slider" min="10" max="200" value="50">
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>Actions</h3>
+                <div class="control-group">
+                    <button id="save-btn">Save Drawing</button>
+                    <button id="clear-btn">Clear Canvas</button>
+                </div>
             </div>
         </div>
     </div>
-
-    <script src="drawing-tool.js"></script>
 </body>
 </html> 
