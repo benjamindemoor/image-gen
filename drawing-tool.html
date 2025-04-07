@@ -212,8 +212,21 @@
                         <span id="pixelation-value">1</span>
                     </div>
                     <div class="slider-container">
+                        <label for="pixelate-checkbox">Pixelate:</label>
+                        <input type="checkbox" id="pixelate-checkbox">
+                    </div>
+                    <div class="slider-container">
+                        <label for="mirror-checkbox">Mirror:</label>
+                        <input type="checkbox" id="mirror-checkbox">
+                    </div>
+                    <div class="slider-container">
                         <label for="stroke-checkbox">Stroke:</label>
                         <input type="checkbox" id="stroke-checkbox">
+                    </div>
+                    <div class="slider-container">
+                        <label for="stroke-color-picker">Stroke Color:</label>
+                        <input type="color" id="stroke-color-picker" value="#000000">
+                        <input type="text" id="stroke-hex" value="#000000" class="hex-input" maxlength="7">
                     </div>
                 </div>
             </div>
@@ -231,16 +244,32 @@
                             <option value="default">Default Brush</option>
                         </select>
                     </div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>Threshold Controls</h3>
+                <div class="control-group">
+                    <select id="saved-settings-select">
+                        <option value="">Load saved settings...</option>
+                    </select>
                     <div class="slider-container">
-                        <label for="size-slider">Size: <span id="size-value">50</span></label>
-                        <input type="range" id="size-slider" min="10" max="200" value="50">
+                        <label for="vertical-stripes-checkbox">Vertical Stripes:</label>
+                        <input type="checkbox" id="vertical-stripes-checkbox">
                     </div>
+                </div>
+                <div id="threshold-container">
+                    <!-- Thresholds will be dynamically added here -->
+                </div>
+                <div class="control-group">
+                    <button id="add-threshold-btn">+ Add Threshold</button>
                 </div>
             </div>
 
             <div class="controls-section">
                 <h3>Actions</h3>
                 <div class="control-group">
+                    <button id="random-btn">Randomize Thresholds</button>
                     <button id="save-btn">Save Drawing</button>
                     <button id="clear-btn">Clear Canvas</button>
                 </div>
