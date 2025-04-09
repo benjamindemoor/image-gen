@@ -8,6 +8,7 @@
     <!-- p5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="sketch.js"></script>
     <style>
         body {
@@ -302,6 +303,76 @@
             background-color: #2196F3;
             box-shadow: 0 2px 5px rgba(33, 150, 243, 0.3);
         }
+
+        /* Progress bar styles */
+        .progress-container {
+            width: 100%;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #000;
+            border: 1px solid #fff;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: #2196F3;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            color: #fff;
+            text-align: center;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .file-input {
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+        }
+
+        .file-input::-webkit-file-upload-button {
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+
+        .file-input::-webkit-file-upload-button:hover {
+            background-color: #fff;
+            color: #000;
+        }
+
+        .brush-preview {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #fff;
+            margin: 10px auto;
+            display: block;
+        }
+
+        .brush-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
@@ -329,11 +400,19 @@
             </div>
             
             <div class="controls-section">
-                <h3>Threshold Image</h3>
+                <h3>Image Upload</h3>
                 <div class="control-group">
-                    <button id="new-image-btn" class="action-button">New Threshold Image</button>
-                    <input type="file" id="image-upload" accept="image/*">
-                    <span id="file-name">No threshold image selected</span>
+                    <label>Single Image Upload:</label>
+                    <input type="file" id="single-image-upload" accept="image/*">
+                    <label>Folder Upload:</label>
+                    <input type="file" id="image-upload" accept="image/*" webkitdirectory directory multiple>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="progress-text">Processing files: 0/0</div>
+                    </div>
+                    <span id="file-name">No image selected</span>
                 </div>
             </div>
             

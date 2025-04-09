@@ -12,6 +12,12 @@ let imageLoaded = false;
 let processedGraphics; // Reusable graphics buffer
 let canvas;
 
+// Batch processing variables
+let imageQueue = [];
+let isProcessingQueue = false;
+let currentQueueIndex = 0;
+let totalImages = 0;
+
 // DOM elements
 let threshold1Slider;
 let threshold1Value;
@@ -28,6 +34,8 @@ let imageUpload;
 let fileName;
 let randomButton;
 let newImageButton;
+let batchProgressBar;
+let batchProgressText;
 
 // Threshold configuration
 let thresholds = [
@@ -70,6 +78,14 @@ let strokeColor = '#000000';
 // Add new variables for stripe patterns
 let hasVerticalStripes = true;
 let hasHorizontalStripes = true;
+
+// Add at the top with other global variables
+let previewMode = true;
+let zip = null;
+let processButton;
+
+// Add to the global variables section
+let singleImageUpload;
 
 // Random color generator using palette
 function getRandomColor() {
@@ -289,7 +305,7 @@ function updateThresholdUI() {
         label.attribute('for', `threshold${index + 1}-slider`);
         
         // Create slider
-        const slider = createInput(threshold.level, 'range');
+        const slider = createInput(threshold.level.toString(), 'range');
         slider.id(`threshold${index + 1}-slider`);
         slider.class('slider');
         slider.attribute('min', 0);
@@ -734,7 +750,7 @@ function loadNewRandomImage() {
     
     // Load a new random flower image
     const timestamp = new Date().getTime();
-    img = loadImage(`https://picsum.photos/800/800?random=${timestamp}&category=nature`, () => {
+    img = loadImage(`https://picsum.photos/800/800?random=${timestamp}&category=flowers`, () => {
         // Store original dimensions
         originalWidth = img.width;
         originalHeight = img.height;
@@ -766,11 +782,18 @@ function handleResize() {
 }
 
 function setup() {
-    // Setup main canvas
+    // Setup main canvas with willReadFrequently attribute
     pixelDensity(1);
     canvas = createCanvas(800, 800);
     canvas.parent('canvas-container');
+    const ctx = canvas.elt.getContext('2d');
+    ctx.canvas.willReadFrequently = true;
     
+    // Create graphics buffers with willReadFrequently
+    processedGraphics = createGraphics(800, 800);
+    const processedCtx = processedGraphics.elt.getContext('2d');
+    processedCtx.canvas.willReadFrequently = true;
+
     // Get DOM elements
     threshold1Slider = select('#threshold1-slider');
     threshold1Value = select('#threshold1-value');
@@ -783,7 +806,7 @@ function setup() {
     backgroundColorPicker = select('#background-color-picker');
     backgroundHex = select('#background-hex');
     saveButton = select('#save-btn');
-    imageUpload = select('#image-upload');
+    singleImageUpload = select('#single-image-upload');
     fileName = select('#file-name');
     randomButton = select('#random-btn');
     newImageButton = select('#new-image-btn');
@@ -856,7 +879,7 @@ function setup() {
     if (backgroundColorPicker) backgroundColorPicker.input(updateBackgroundColor);
     if (backgroundHex) backgroundHex.input(updateBackgroundHex);
     if (saveButton) saveButton.mousePressed(saveDitheredImage);
-    if (imageUpload) imageUpload.input(handleFileUpload);
+    if (singleImageUpload) singleImageUpload.input(handleSingleImageUpload);
     if (randomButton) randomButton.mousePressed(randomizeSettings);
     if (newImageButton) newImageButton.mousePressed(loadNewRandomImage);
     
@@ -891,6 +914,8 @@ function onImageLoaded() {
         processedGraphics.remove();
     }
     processedGraphics = createGraphics(img.width, img.height);
+    const ctx = processedGraphics.elt.getContext('2d');
+    ctx.canvas.willReadFrequently = true;
     
     // Hide loading screen
     const loadingScreen = document.getElementById('loading-screen');
@@ -913,6 +938,8 @@ function draw() {
     // Create graphics buffer only once when needed
     if (!processedGraphics && img) {
         processedGraphics = createGraphics(img.width, img.height);
+        const ctx = processedGraphics.elt.getContext('2d');
+        ctx.canvas.willReadFrequently = true;
     }
     
     // Clear previous content
@@ -1136,330 +1163,226 @@ function draw() {
     image(processedGraphics, 0, 0, width, height);
 }
 
-function handleFileUpload() {
-    if (imageUpload.elt.files.length > 0) {
-        const file = imageUpload.elt.files[0];
-        fileName.html(file.name);
-        
-        // Show loading screen
-        const loadingScreen = document.getElementById('loading-screen');
-        const loadingText = document.getElementById('loading-text');
-        if (loadingScreen && loadingText) {
-            loadingScreen.style.width = canvasWidth + 'px';
-            loadingScreen.style.height = canvasHeight + 'px';
-            loadingScreen.style.backgroundColor = '#000000';
-            loadingText.style.color = '#FFFFFF';
-            loadingScreen.style.display = 'flex';
-        }
-        
-        // Create a FileReader to read the file
-        const reader = new FileReader();
-        
-        reader.onload = function(event) {
-            // Clean up old graphics objects
+function handleSingleImageUpload() {
+    const file = singleImageUpload.elt.files[0];
+    if (!file || !file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        return;
+    }
+
+    // Create a FileReader to read the file
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+        // Load and process the image
+        loadImage(event.target.result, (loadedImg) => {
+            img = loadedImg;
+            originalWidth = img.width;
+            originalHeight = img.height;
+            
+            // Calculate scale and resize canvas
+            calculateScale();
+            resizeCanvas(canvasWidth, canvasHeight);
+            
+            // Create new graphics buffer
             if (processedGraphics) {
                 processedGraphics.remove();
-                processedGraphics = null;
             }
+            processedGraphics = createGraphics(img.width, img.height);
+            const ctx = processedGraphics.elt.getContext('2d');
+            ctx.canvas.willReadFrequently = true;
             
-            // Create a new image from the file data
-            img = loadImage(event.target.result, onImageLoaded);
-        };
+            // Process the image
+            imageLoaded = true;
+            fileName.html(`Preview: ${file.name}`);
+            
+            // Force one draw cycle to process the image
+            draw();
+        });
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+function handleFolderUpload() {
+    const files = imageUpload.elt.files;
+    if (files.length === 0) return;
+
+    // Clear existing queue
+    imageQueue = [];
+    currentQueueIndex = 0;
+    isProcessingQueue = true;
+    
+    // Filter only image files
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+            imageQueue.push(file);
+        }
+    }
+    
+    totalImages = imageQueue.length;
+    
+    if (totalImages === 0) {
+        alert('No valid image files found');
+        return;
+    }
+    
+    // Update UI to show total images
+    fileName.html(`Preview mode: ${totalImages} images loaded`);
+    
+    // Initialize progress bar if it doesn't exist
+    if (!batchProgressBar) {
+        const uploadSection = select('#file-upload-section');
+        if (!uploadSection) {
+            // Create the section if it doesn't exist
+            const controlPanel = select('.controls-panel');
+            if (controlPanel) {
+                const section = createDiv('');
+                section.id('file-upload-section');
+                section.parent(controlPanel);
+            }
+        }
         
-        reader.readAsDataURL(file);
+        // Create progress elements
+        batchProgressBar = createDiv('');
+        batchProgressBar.class('batch-progress-bar');
+        batchProgressBar.parent('#file-upload-section');
+        
+        batchProgressText = createDiv('');
+        batchProgressText.class('batch-progress-text');
+        batchProgressText.parent('#file-upload-section');
     }
-}
 
-function calculateScale() {
-    if (!img) return;
-    
-    // Calculate available space (window width minus sidebar width)
-    const sidebarWidth = 300; // Width of the controls panel
-    const availableWidth = window.innerWidth - sidebarWidth;
-    const availableHeight = window.innerHeight;
-    
-    // Calculate scale based on available space
-    const scaleWidth = availableWidth / img.width;
-    const scaleHeight = availableHeight / img.height;
-    
-    // Use the smaller scale to ensure the image fits
-    scale = Math.min(scaleWidth, scaleHeight);
-    
-    // Calculate new dimensions
-    canvasWidth = img.width * scale;
-    canvasHeight = img.height * scale;
-    
-    // Center the canvas
-    const canvasContainer = document.getElementById('canvas-container');
-    if (canvasContainer) {
-        canvasContainer.style.display = 'flex';
-        canvasContainer.style.justifyContent = 'center';
-        canvasContainer.style.alignItems = 'center';
+    // Create process button if it doesn't exist
+    if (!processButton) {
+        processButton = createButton('Process All Images');
+        processButton.class('action-button');
+        processButton.parent('#file-upload-section');
+        processButton.mousePressed(() => {
+            previewMode = false;
+            currentQueueIndex = 0;
+            isProcessingQueue = true;
+            processNextImage();
+        });
     }
+    
+    // Start preview of first image
+    previewMode = true;
+    processNextImage();
 }
 
-function hexToRgb(hex) {
-  if (!hex) return { r: 0, g: 0, b: 0 }; // Return black if hex is undefined
-  
-  // Remove the hash if it exists
-  hex = hex.replace('#', '');
-  
-  // Parse the hex values
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  
-  return { r, g, b };
+function processNextImage() {
+    if (!isProcessingQueue || currentQueueIndex >= imageQueue.length) {
+        // Queue processing complete
+        isProcessingQueue = false;
+        fileName.html('All images processed!');
+        return;
+    }
+    
+    const file = imageQueue[currentQueueIndex];
+    
+    if (!previewMode) {
+        // Update progress during processing
+        const progress = ((currentQueueIndex + 1) / totalImages) * 100;
+        batchProgressBar.style('width', `${progress}%`);
+        batchProgressText.html(`Processing image ${currentQueueIndex + 1} of ${totalImages}: ${file.name}`);
+    }
+    
+    // Create a FileReader to read the file
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+        // Load and process the image
+        loadImage(event.target.result, (loadedImg) => {
+            img = loadedImg;
+            originalWidth = img.width;
+            originalHeight = img.height;
+            
+            // Calculate scale and resize canvas
+            calculateScale();
+            resizeCanvas(canvasWidth, canvasHeight);
+            
+            // Create new graphics buffer
+            if (processedGraphics) {
+                processedGraphics.remove();
+            }
+            processedGraphics = createGraphics(img.width, img.height);
+            const ctx = processedGraphics.elt.getContext('2d');
+            ctx.canvas.willReadFrequently = true;
+            
+            // Process and save the image
+            imageLoaded = true;
+            
+            // Force one draw cycle to process the image
+            draw();
+            
+            if (!previewMode) {
+                // Generate filename for this image
+                const processedName = generateProcessedFilename(file.name);
+                
+                // Create a temporary canvas for saving
+                let tempCanvas = createGraphics(processedGraphics.width, processedGraphics.height);
+                tempCanvas.image(processedGraphics, 0, 0);
+                
+                // Save the canvas as PNG
+                saveCanvas(tempCanvas, processedName, 'png');
+                
+                // Clean up
+                tempCanvas.remove();
+                
+                // Move to next image after a short delay to ensure save completes
+                setTimeout(() => {
+                    currentQueueIndex++;
+                    processNextImage();
+                }, 1000); // Increased delay to 1 second to ensure save completes
+            } else {
+                // In preview mode, just show the current image
+                fileName.html(`Preview: ${file.name} (Image ${currentQueueIndex + 1} of ${totalImages})`);
+            }
+        });
+    };
+    
+    reader.readAsDataURL(file);
 }
 
-function saveDitheredImage() {
+function generateProcessedFilename(originalName) {
+    const nameParts = originalName.split('.');
+    const extension = nameParts.pop();
+    const baseName = nameParts.join('.');
+    const timestamp = new Date().getTime();
+    return `${baseName}_processed_${timestamp}.${extension}`;
+}
+
+function saveDitheredImage(customFilename = null) {
     if (!imageLoaded) {
-        alert("Please upload an image first");
+        alert("No image loaded to save");
         return;
     }
     
     // Visual feedback when saving
-    saveButton.style('background-color', '#1976D2');
-    setTimeout(() => {
-        saveButton.style('background-color', '#2196F3');
-    }, 200);
-    
-    // Create a temporary canvas for the processed image
-    let tempCanvas = createGraphics(img.width, img.height);
-    tempCanvas.clear(); // Clear with transparency
-    
-    // Process the image
-    let processed = createGraphics(img.width, img.height);
-    processed.clear(); // Clear with transparency
-    
-    // Apply pixelation if enabled
-    if (isPixelated) {
-        let pixelated = createGraphics(img.width, img.height);
-        pixelated.clear(); // Clear with transparency
-        pixelated.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
-        pixelated.loadPixels();
-        
-        for (let y = 0; y < img.height; y += pixelationLevel) {
-            for (let x = 0; x < img.width; x += pixelationLevel) {
-                const i = (x + y * img.width) * 4;
-                const r = pixelated.pixels[i];
-                const g = pixelated.pixels[i + 1];
-                const b = pixelated.pixels[i + 2];
-                const a = pixelated.pixels[i + 3]; // Preserve alpha
-                
-                for (let py = 0; py < pixelationLevel && y + py < img.height; py++) {
-                    for (let px = 0; px < pixelationLevel && x + px < img.width; px++) {
-                        const pi = (x + px + (y + py) * img.width) * 4;
-                        pixelated.pixels[pi] = r;
-                        pixelated.pixels[pi + 1] = g;
-                        pixelated.pixels[pi + 2] = b;
-                        pixelated.pixels[pi + 3] = a; // Preserve alpha
-                    }
-                }
-            }
-        }
-        
-        pixelated.updatePixels();
-        processed.image(pixelated, 0, 0);
-        pixelated.remove();
-    } else {
-        processed.image(img, 0, 0);
+    if (saveButton) {
+        saveButton.style('background-color', '#1976D2');
+        setTimeout(() => {
+            saveButton.style('background-color', '#2196F3');
+        }, 200);
     }
     
-    processed.loadPixels();
+    // Create a temporary canvas for the processed image with the same dimensions as processedGraphics
+    let tempCanvas = createGraphics(processedGraphics.width, processedGraphics.height);
+    const ctx = tempCanvas.elt.getContext('2d');
+    ctx.canvas.willReadFrequently = true;
     
-    // Find the lightest threshold color
-    let lightestColor = backgroundColor;
-    let lightestBrightness = 0;
+    // Copy the processed image to the temporary canvas
+    tempCanvas.image(processedGraphics, 0, 0);
     
-    // Calculate brightness for each threshold color
-    for (let i = 0; i < thresholds.length; i++) {
-        const color = hexToRgb(thresholds[i].color);
-        const brightness = (color.r + color.g + color.b) / 3;
-        if (brightness > lightestBrightness) {
-            lightestBrightness = brightness;
-            lightestColor = thresholds[i].color;
-        }
-    }
-    
-    // Create a copy of the pixels array to avoid modifying it while reading
-    const originalPixels = processed.pixels.slice();
-    
-    // Apply multi-threshold coloring
-    for (let i = 0; i < processed.pixels.length; i += 4) {
-        const gray = (originalPixels[i] + originalPixels[i + 1] + originalPixels[i + 2]) / 3;
-        const alpha = originalPixels[i + 3]; // Get original alpha value
-        
-        // Find the appropriate threshold level
-        let colorIndex = thresholds.length;
-        for (let j = 0; j < thresholds.length; j++) {
-            if (gray <= thresholds[j].level) {
-                colorIndex = j;
-                break;
-            }
-        }
-        
-        if (colorIndex < thresholds.length) {
-            const threshold = thresholds[colorIndex];
-            const x = (i / 4) % processed.width;
-            const y = Math.floor((i / 4) / processed.width);
-            
-            if (colorIndex === 1 && hasVerticalStripes) {
-                // Second threshold: vertical stripes pattern
-                const blockSize = 2;
-                const isEvenBlock = Math.floor(x / blockSize) % 2 === 0;
-                const color = isEvenBlock ? hexToRgb(threshold.color) : hexToRgb(thresholds[0].color);
-                
-                processed.pixels[i] = color.r;
-                processed.pixels[i + 1] = color.g;
-                processed.pixels[i + 2] = color.b;
-                processed.pixels[i + 3] = alpha;
-            } else {
-                // Other thresholds: solid color
-                const color = hexToRgb(threshold.color);
-                processed.pixels[i] = color.r;
-                processed.pixels[i + 1] = color.g;
-                processed.pixels[i + 2] = color.b;
-                processed.pixels[i + 3] = alpha;
-            }
-        } else {
-            // For background, apply horizontal stripes pattern using background color and lightest threshold color
-            const x = (i / 4) % processed.width;
-            const y = Math.floor((i / 4) / processed.width);
-            
-            if (hasHorizontalStripes) {
-                // Create horizontal stripes pattern
-                const blockSize = 2; // Height of each stripe
-                const isEvenBlock = Math.floor(y / blockSize) % 2 === 0;
-                const color = isEvenBlock ? hexToRgb(backgroundColor) : hexToRgb(lightestColor);
-                
-                processed.pixels[i] = color.r;
-                processed.pixels[i + 1] = color.g;
-                processed.pixels[i + 2] = color.b;
-                processed.pixels[i + 3] = alpha;
-            } else {
-                // Solid background color
-                const color = hexToRgb(backgroundColor);
-                processed.pixels[i] = color.r;
-                processed.pixels[i + 1] = color.g;
-                processed.pixels[i + 2] = color.b;
-                processed.pixels[i + 3] = alpha;
-            }
-        }
-    }
-    
-    processed.updatePixels();
-    
-    // Apply stroke if enabled
-    if (hasStroke) {
-        // Create a temporary graphics buffer for the stroke
-        let strokeGraphics = createGraphics(processed.width, processed.height);
-        strokeGraphics.clear(); // Clear with transparency
-        strokeGraphics.copy(processed, 0, 0, processed.width, processed.height, 0, 0, processed.width, processed.height);
-        strokeGraphics.loadPixels();
-        
-        // Create a copy of the pixels array to avoid modifying it while reading
-        const originalPixels = strokeGraphics.pixels.slice();
-        
-        // Apply stroke to edges
-        for (let y = 1; y < processed.height - 1; y++) {
-            for (let x = 1; x < processed.width - 1; x++) {
-                const i = (x + y * processed.width) * 4;
-                
-                // Get the gray value of the current pixel
-                const gray = (originalPixels[i] + originalPixels[i + 1] + originalPixels[i + 2]) / 3;
-                
-                // Find the appropriate threshold level
-                let colorIndex = thresholds.length;
-                for (let j = 0; j < thresholds.length; j++) {
-                    if (gray <= thresholds[j].level) {
-                        colorIndex = j;
-                        break;
-                    }
-                }
-                
-                // Check if current pixel is different from any of its neighbors
-                const currentColor = {
-                    r: originalPixels[i],
-                    g: originalPixels[i + 1],
-                    b: originalPixels[i + 2],
-                    a: originalPixels[i + 3]
-                };
-                const leftColor = {
-                    r: originalPixels[i - 4],
-                    g: originalPixels[i - 3],
-                    b: originalPixels[i - 2],
-                    a: originalPixels[i - 1]
-                };
-                const rightColor = {
-                    r: originalPixels[i + 4],
-                    g: originalPixels[i + 5],
-                    b: originalPixels[i + 6],
-                    a: originalPixels[i + 7]
-                };
-                const topColor = {
-                    r: originalPixels[i - processed.width * 4],
-                    g: originalPixels[i - processed.width * 4 + 1],
-                    b: originalPixels[i - processed.width * 4 + 2],
-                    a: originalPixels[i - processed.width * 4 + 3]
-                };
-                const bottomColor = {
-                    r: originalPixels[i + processed.width * 4],
-                    g: originalPixels[i + processed.width * 4 + 1],
-                    b: originalPixels[i + processed.width * 4 + 2],
-                    a: originalPixels[i + processed.width * 4 + 3]
-                };
-                
-                // Check if this pixel is part of a stripes pattern
-                const isVerticalStripes = Math.floor(x / 2) % 2 === 0;
-                const isHorizontalStripes = Math.floor(y / 2) % 2 === 0;
-                const isInStripesPattern = isVerticalStripes || isHorizontalStripes;
-                
-                // Check if this pixel is part of the background
-                const isBackground = colorIndex === thresholds.length;
-                
-                // Only apply stroke if it's a corner or edge pixel, not transparent, not part of stripes pattern, and not background
-                const isLeftEdge = !colorsEqual(currentColor, leftColor);
-                const isRightEdge = !colorsEqual(currentColor, rightColor);
-                const isTopEdge = !colorsEqual(currentColor, topColor);
-                const isBottomEdge = !colorsEqual(currentColor, bottomColor);
-                
-                if (currentColor.a > 0 && !isInStripesPattern && !isBackground && 
-                    ((isLeftEdge && isTopEdge) || (isLeftEdge && isBottomEdge) || 
-                    (isRightEdge && isTopEdge) || (isRightEdge && isBottomEdge) ||
-                    (isLeftEdge && !isRightEdge && !isTopEdge && !isBottomEdge) ||
-                    (isRightEdge && !isLeftEdge && !isTopEdge && !isBottomEdge) ||
-                    (isTopEdge && !isLeftEdge && !isRightEdge && !isBottomEdge) ||
-                    (isBottomEdge && !isLeftEdge && !isRightEdge && !isTopEdge))) {
-                    const stroke = hexToRgb(strokeColor);
-                    processed.pixels[i] = stroke.r;
-                    processed.pixels[i + 1] = stroke.g;
-                    processed.pixels[i + 2] = stroke.b;
-                    processed.pixels[i + 3] = currentColor.a; // Preserve original alpha
-                }
-            }
-        }
-        
-        processed.updatePixels();
-        strokeGraphics.remove();
-    }
-    
-    // Draw the processed image to the temporary canvas
-    tempCanvas.image(processed, 0, 0);
-    
-    // Generate filename with random name, category, date, and seconds
-    const randomName = generateRandomName();
-    const category = 'threshold';
-    const date = new Date();
-    const dateStr = date.toISOString().split('T')[0];
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const filename = `${randomName}_${category}_${dateStr}_${seconds}.png`;
+    // Use custom filename if provided, otherwise generate one
+    const filename = customFilename || `${generateRandomName()}_threshold_${new Date().toISOString().split('T')[0]}_${new Date().getSeconds().toString().padStart(2, '0')}.png`;
     
     // Save the temporary canvas with transparency
     saveCanvas(tempCanvas, filename, 'png');
     
     // Clean up
-    processed.remove();
     tempCanvas.remove();
 }
 
@@ -1556,4 +1479,42 @@ function toggleHorizontalStripes() {
         checkbox.checked(hasHorizontalStripes);
     }
     saveSettings();
+}
+
+// Add missing utility functions
+function calculateScale() {
+    // Get the available width and height for the canvas
+    const containerWidth = windowWidth - 300; // Subtract control panel width
+    const containerHeight = windowHeight - 60; // Subtract header height
+
+    // Calculate scale to fit image within container while maintaining aspect ratio
+    const scaleX = containerWidth / originalWidth;
+    const scaleY = containerHeight / originalHeight;
+    scale = Math.min(scaleX, scaleY);
+
+    // Calculate final canvas dimensions
+    canvasWidth = Math.floor(originalWidth * scale);
+    canvasHeight = Math.floor(originalHeight * scale);
+}
+
+function hexToRgb(hex) {
+    // Remove the hash if present
+    hex = hex.replace(/^#/, '');
+
+    // Parse the hex values
+    const bigint = parseInt(hex, 16);
+    return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255
+    };
+}
+
+// Add FileSaver.js polyfill for older browsers
+function saveAs(blob, filename) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
 }
