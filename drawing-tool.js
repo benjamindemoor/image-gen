@@ -213,14 +213,17 @@ function setup() {
     if (backgroundColorPicker) backgroundColorPicker.input(updateBackgroundColor);
     if (backgroundHex) backgroundHex.input(updateBackgroundHex);
     
-    // Initialize UI values
-    updateUIValues();
-    
+    // Initialize thresholds only if no saved settings exist
+    const savedSettings = localStorage.getItem('drawingToolSettings');
+    if (!savedSettings) {
+        initializeThresholds();
+    }
+
     // Load saved settings
     loadSettings();
     
-    // Initialize thresholds
-    initializeThresholds();
+    // Initialize UI values after loading settings
+    updateUIValues();
     
     // Add event listeners for threshold controls
     const addThresholdBtn = select('#add-threshold-btn');
@@ -296,7 +299,7 @@ function drawBrush() {
     
     if (isUsingBrush && brushImage) {
         tempGraphics.imageMode(CENTER);
-        tempGraphics.image(brushImage, 0, 0, imageSize, imageSize);
+    tempGraphics.image(brushImage, 0, 0, imageSize, imageSize);
     } else {
         drawPattern(currentPattern, 0, 0, imageSize, false, tempGraphics);
     }
@@ -764,43 +767,106 @@ function loadSelectedSettings() {
 }
 
 function loadSettings() {
-    const savedSettings = localStorage.getItem('drawingToolSettings');
-    if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        
-        // Apply settings
-        thresholds = settings.thresholds || thresholds;
-        backgroundColor = settings.backgroundColor || backgroundColor;
-        hasVerticalStripes = settings.hasVerticalStripes !== undefined ? settings.hasVerticalStripes : hasVerticalStripes;
-        
-        // Update UI with null checks
-        updateThresholdUI();
-        
-        const verticalStripesCheckbox = select('#vertical-stripes-checkbox');
-        if (verticalStripesCheckbox) {
-            verticalStripesCheckbox.checked(hasVerticalStripes);
+    try {
+        const savedSettings = localStorage.getItem('drawingToolSettings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            
+            // Apply settings with type checking
+            if (Array.isArray(settings.thresholds)) {
+                thresholds = settings.thresholds;
+            }
+            if (typeof settings.backgroundColor === 'string') {
+                backgroundColor = settings.backgroundColor;
+            }
+            if (typeof settings.hasVerticalStripes === 'boolean') {
+                hasVerticalStripes = settings.hasVerticalStripes;
+            }
+            if (typeof settings.currentPattern === 'string') {
+                currentPattern = settings.currentPattern;
+            }
+            if (typeof settings.patternColor === 'string') {
+                patternColor = settings.patternColor;
+            }
+            if (typeof settings.rotationSpeed === 'number') {
+                rotationSpeed = settings.rotationSpeed;
+            }
+            if (typeof settings.imageSize === 'number') {
+                imageSize = settings.imageSize;
+            }
+            if (typeof settings.hasStroke === 'boolean') {
+                hasStroke = settings.hasStroke;
+            }
+            if (typeof settings.pixelationLevel === 'number') {
+                pixelationLevel = settings.pixelationLevel;
+            }
+            if (typeof settings.strokeColor === 'string') {
+                strokeColor = settings.strokeColor;
+            }
+            if (typeof settings.isPixelated === 'boolean') {
+                isPixelated = settings.isPixelated;
+            }
+            if (typeof settings.isMirrored === 'boolean') {
+                isMirrored = settings.isMirrored;
+            }
+            if (typeof settings.isUsingBrush === 'boolean') {
+                isUsingBrush = settings.isUsingBrush;
+            }
+            
+            // Load uploaded images
+            if (Array.isArray(settings.uploadedImages)) {
+                uploadedImages = [];
+                settings.uploadedImages.forEach(imgData => {
+                    if (typeof imgData.data === 'string') {
+                        loadImage(imgData.data, img => {
+                            uploadedImages.push({
+                                name: imgData.name,
+                                image: img,
+                                data: imgData.data
+                            });
+                            updateImageSelect();
+                        });
+                    }
+                });
+            }
+            
+            // Update UI
+            updateThresholdUI();
+            updateUIValues();
         }
-        
-        const backgroundColorPicker = select('#background-color-picker');
-        const backgroundHex = select('#background-hex');
-        
-        if (backgroundColorPicker) {
-            backgroundColorPicker.value(backgroundColor);
-        }
-        if (backgroundHex) {
-            backgroundHex.value(backgroundColor);
-        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        // Initialize with defaults if loading fails
+        initializeThresholds();
     }
 }
 
 function saveSettings() {
-    const settings = {
-        thresholds,
-        backgroundColor,
-        hasVerticalStripes
-    };
-    
-    localStorage.setItem('drawingToolSettings', JSON.stringify(settings));
+    try {
+        const settings = {
+            thresholds,
+            backgroundColor,
+            hasVerticalStripes,
+            currentPattern,
+            patternColor,
+            rotationSpeed,
+            imageSize,
+            hasStroke,
+            pixelationLevel,
+            strokeColor,
+            isPixelated,
+            isMirrored,
+            isUsingBrush,
+            uploadedImages: uploadedImages.map(img => ({
+                name: img.name,
+                data: img.data
+            }))
+        };
+        
+        localStorage.setItem('drawingToolSettings', JSON.stringify(settings));
+    } catch (error) {
+        console.error('Error saving settings:', error);
+    }
 }
 
 function updateThresholdUI() {
