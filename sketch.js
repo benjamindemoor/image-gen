@@ -87,6 +87,14 @@ let processButton;
 // Add to the global variables section
 let singleImageUpload;
 
+// Add dithering variables
+let ditherType = 'none';
+let ditherThreshold = 128;
+
+// Add Riso color variables
+let useRisoColors = false;
+const risoColors = ['#0078bf', '#ff7477', '#ffe800', '#ff48b0', '#5ec8e5', '#00a95c', '#ffffff'];
+
 // Random color generator using palette
 function getRandomColor() {
   if (colorPalette.length === 0) {
@@ -205,7 +213,8 @@ function saveSettings() {
     hasStroke,
     strokeColor,
     hasVerticalStripes,
-    hasHorizontalStripes
+    hasHorizontalStripes,
+    useRisoColors
   };
   
   // Save to localStorage
@@ -218,14 +227,22 @@ function loadSettings() {
     const settings = JSON.parse(savedSettings);
     
     // Apply settings to variables
-    backgroundColor = settings.backgroundColor;
-    thresholds = settings.thresholds;
+    backgroundColor = settings.backgroundColor || '#FFFFFF';
+    thresholds = settings.thresholds || [
+        { level: 26, color: '#000000' },
+        { level: 71, color: '#333333' },
+        { level: 91, color: '#666666' },
+        { level: 128, color: '#999999' },
+        { level: 167, color: '#CCCCCC' },
+        { level: 202, color: '#FFFFFF' }
+    ];
     isPixelated = settings.isPixelated || false;
     pixelationLevel = settings.pixelationLevel || 8;
     hasStroke = settings.hasStroke || false;
     strokeColor = settings.strokeColor || '#000000';
     hasVerticalStripes = settings.hasVerticalStripes !== undefined ? settings.hasVerticalStripes : true;
     hasHorizontalStripes = settings.hasHorizontalStripes !== undefined ? settings.hasHorizontalStripes : true;
+    useRisoColors = settings.useRisoColors || false;
     
     // Update UI elements if they exist
     if (backgroundColorPicker) {
@@ -278,46 +295,54 @@ function loadSettings() {
     if (horizontalStripesCheckbox) {
       horizontalStripesCheckbox.checked(hasHorizontalStripes);
     }
+    
+    // Update Riso colors checkbox
+    const risoColorsCheckbox = select('#riso-colors-checkbox');
+    if (risoColorsCheckbox) {
+      risoColorsCheckbox.checked(useRisoColors);
+    }
   }
 }
 
 function updateThresholdUI() {
-    // Clear existing thresholds
     const container = select('#threshold-container');
     container.html('');
-    thresholdCount = thresholds.length;
     
-    // Create threshold elements for each saved threshold
     thresholds.forEach((threshold, index) => {
         const thresholdGroup = createDiv('');
         thresholdGroup.class('threshold-group');
         
-        // Create remove button
-        const removeButton = createButton('×');
-        removeButton.class('remove-threshold');
-        removeButton.mousePressed(() => removeThreshold(thresholdGroup, index + 1));
+        // Create up/down buttons
+        const moveButtons = createDiv('');
+        moveButtons.class('move-buttons');
         
-        // Create label
+        const upButton = createButton('↑');
+        upButton.class('move-button');
+        upButton.mousePressed(() => moveThreshold(index, -1));
+        if (index === 0) upButton.attribute('disabled', '');
+        
+        const downButton = createButton('↓');
+        downButton.class('move-button');
+        downButton.mousePressed(() => moveThreshold(index, 1));
+        if (index === thresholds.length - 1) downButton.attribute('disabled', '');
+        
+        moveButtons.child(upButton);
+        moveButtons.child(downButton);
+        
+        // Create threshold controls
         const label = createElement('label', `Threshold ${index + 1}: `);
         const valueSpan = createSpan(threshold.level);
         valueSpan.id(`threshold${index + 1}-value`);
         label.child(valueSpan);
-        label.attribute('for', `threshold${index + 1}-slider`);
         
-        // Create slider
-        const slider = createInput(threshold.level.toString(), 'range');
+        const slider = createInput(threshold.level, 'range');
         slider.id(`threshold${index + 1}-slider`);
-        slider.class('slider');
         slider.attribute('min', 0);
         slider.attribute('max', 255);
         slider.input(() => updateThresholdValue(index + 1, slider, valueSpan));
         
-        // Create color option
         const colorOption = createDiv('');
         colorOption.class('color-option');
-        
-        const colorLabel = createElement('label', `Color ${index + 1}:`);
-        colorLabel.attribute('for', `threshold${index + 1}-color-picker`);
         
         const colorPicker = createInput(threshold.color, 'color');
         colorPicker.id(`threshold${index + 1}-color-picker`);
@@ -329,75 +354,63 @@ function updateThresholdUI() {
         hexInput.attribute('maxlength', 7);
         hexInput.input(() => updateThresholdHex(index + 1, hexInput, colorPicker));
         
-        // Create swap button if this is not the last threshold
-        if (index < thresholds.length - 1) {
-            const swapButton = createButton('⇄');
-            swapButton.class('swap-colors');
-            swapButton.mousePressed(() => swapColors(index + 1, index + 2));
-            colorOption.child(swapButton);
-        }
-        
         // Assemble the elements
-        colorOption.child(colorLabel);
         colorOption.child(colorPicker);
         colorOption.child(hexInput);
         
-        thresholdGroup.child(removeButton);
+        thresholdGroup.child(moveButtons);
         thresholdGroup.child(label);
         thresholdGroup.child(slider);
         thresholdGroup.child(colorOption);
         
         container.child(thresholdGroup);
     });
-    
-    // Add "Add New Threshold" button at the bottom
-    const addButtonContainer = createDiv('');
-    addButtonContainer.class('add-threshold-container');
-    
-    const addButton = createButton('+ Add New Threshold');
-    addButton.class('add-threshold-button');
-    addButton.mousePressed(addNewThreshold);
-    
-    addButtonContainer.child(addButton);
-    container.child(addButtonContainer);
 }
 
-// Add CSS styles for the new elements
+function moveThreshold(index, direction) {
+    if ((index === 0 && direction === -1) || (index === thresholds.length - 1 && direction === 1)) {
+        return; // Can't move beyond array bounds
+    }
+    
+    // Only swap colors
+    const tempColor = thresholds[index].color;
+    thresholds[index].color = thresholds[index + direction].color;
+    thresholds[index + direction].color = tempColor;
+    
+    // Update UI
+    updateThresholdUI();
+    
+    // Save settings
+    saveSettings();
+}
+
+// Add CSS for move buttons
 const style = document.createElement('style');
 style.textContent = `
-    .add-threshold-container {
-        margin-top: 20px;
-        text-align: center;
+    .move-buttons {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 10px;
     }
     
-    .add-threshold-button {
-        background-color: #333;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
+    .move-button {
+        background-color: #000;
+        border: 1px solid #fff;
+        color: #fff;
+        padding: 2px 8px;
         cursor: pointer;
-        font-size: 14px;
-        transition: background-color 0.2s;
+        font-family: 'Courier New', monospace;
+        transition: all 0.3s;
     }
     
-    .add-threshold-button:hover {
-        background-color: #444;
+    .move-button:hover:not([disabled]) {
+        background-color: #fff;
+        color: #000;
     }
     
-    .swap-colors {
-        background-color: #333;
-        color: white;
-        border: none;
-        padding: 4px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        margin-left: 8px;
-        transition: background-color 0.2s;
-    }
-    
-    .swap-colors:hover {
-        background-color: #444;
+    .move-button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 `;
 document.head.appendChild(style);
@@ -418,15 +431,23 @@ function updateThresholdValue(index, slider, valueSpan) {
 }
 
 function updateThresholdColor(index, colorPicker, hexInput) {
-  const color = colorPicker.value();
+  let color = colorPicker.value();
+  if (useRisoColors) {
+    color = findClosestRisoColor(color);
+    colorPicker.value(color);
+  }
   thresholds[index - 1].color = color;
   hexInput.value(color);
   saveSettings();
 }
 
 function updateThresholdHex(index, hexInput, colorPicker) {
-  const hex = hexInput.value();
+  let hex = hexInput.value();
   if (isValidHex(hex)) {
+    if (useRisoColors) {
+      hex = findClosestRisoColor(hex);
+      hexInput.value(hex);
+    }
     thresholds[index - 1].color = hex;
     colorPicker.value(hex);
     saveSettings();
@@ -581,7 +602,8 @@ function saveCurrentSettings() {
     hasStroke,
     strokeColor,
     hasVerticalStripes,
-    hasHorizontalStripes
+    hasHorizontalStripes,
+    useRisoColors
   };
   
   // Get existing settings
@@ -643,6 +665,7 @@ function loadSelectedSettings() {
     strokeColor = settings.strokeColor || '#000000';
     hasVerticalStripes = settings.hasVerticalStripes !== undefined ? settings.hasVerticalStripes : true;
     hasHorizontalStripes = settings.hasHorizontalStripes !== undefined ? settings.hasHorizontalStripes : true;
+    useRisoColors = settings.useRisoColors || false;
     
     // Update UI
     if (backgroundColorPicker) {
@@ -894,6 +917,18 @@ function setup() {
     
     // Load default image
     loadDefaultImage();
+    
+    // Add switch thresholds button event listener
+    const switchThresholdsButton = select('#switch-thresholds');
+    if (switchThresholdsButton) {
+        switchThresholdsButton.mousePressed(switchThresholds);
+    }
+    
+    // Add random image button event listener
+    const randomImageButton = select('#random-image-btn');
+    if (randomImageButton) {
+        randomImageButton.mousePressed(randomizeImage);
+    }
 }
 
 function onImageLoaded() {
@@ -935,55 +970,69 @@ function draw() {
         return;
     }
     
-    // Create graphics buffer only once when needed
-    if (!processedGraphics && img) {
+    // Update dither threshold based on mouse position
+    ditherThreshold = map(mouseX, 0, width, 0, 255);
+
+    // Create graphics buffer for processing
+    if (!processedGraphics) {
         processedGraphics = createGraphics(img.width, img.height);
-        const ctx = processedGraphics.elt.getContext('2d');
-        ctx.canvas.willReadFrequently = true;
     }
-    
-    // Clear previous content
-    processedGraphics.clear();
-    
+
+    // Apply dithering if enabled
+    if (ditherType !== 'none') {
+        let dithered = ditherImage(img, ditherType, ditherThreshold);
+        processedGraphics.image(dithered, 0, 0);
+    } else {
+        processedGraphics.image(img, 0, 0);
+    }
+
     // Apply pixelation if enabled
     if (isPixelated) {
-        if (!pixelatedGraphics || pixelatedGraphics.width !== img.width || pixelatedGraphics.height !== img.height) {
-            if (pixelatedGraphics) {
-                pixelatedGraphics.remove();
-            }
-            pixelatedGraphics = createGraphics(img.width, img.height);
-        }
+        let pixelated = createGraphics(processedGraphics.width, processedGraphics.height);
+        pixelated.copy(processedGraphics, 0, 0, processedGraphics.width, processedGraphics.height, 0, 0, processedGraphics.width, processedGraphics.height);
+        pixelated.loadPixels();
         
-        pixelatedGraphics.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
-        pixelatedGraphics.loadPixels();
-        
-        for (let y = 0; y < img.height; y += pixelationLevel) {
-            for (let x = 0; x < img.width; x += pixelationLevel) {
-                const i = (x + y * img.width) * 4;
-                const r = pixelatedGraphics.pixels[i];
-                const g = pixelatedGraphics.pixels[i + 1];
-                const b = pixelatedGraphics.pixels[i + 2];
+        for (let y = 0; y < pixelated.height; y += pixelationLevel) {
+            for (let x = 0; x < pixelated.width; x += pixelationLevel) {
+                // Calculate average color for this block
+                let r = 0, g = 0, b = 0, a = 0, count = 0;
                 
-                for (let py = 0; py < pixelationLevel && y + py < img.height; py++) {
-                    for (let px = 0; px < pixelationLevel && x + px < img.width; px++) {
-                        const pi = (x + px + (y + py) * img.width) * 4;
-                        pixelatedGraphics.pixels[pi] = r;
-                        pixelatedGraphics.pixels[pi + 1] = g;
-                        pixelatedGraphics.pixels[pi + 2] = b;
+                for (let py = 0; py < pixelationLevel && y + py < pixelated.height; py++) {
+                    for (let px = 0; px < pixelationLevel && x + px < pixelated.width; px++) {
+                        const i = 4 * ((y + py) * pixelated.width + (x + px));
+                        r += pixelated.pixels[i];
+                        g += pixelated.pixels[i + 1];
+                        b += pixelated.pixels[i + 2];
+                        a += pixelated.pixels[i + 3];
+                        count++;
+                    }
+                }
+                
+                // Apply average color to this block
+                r = Math.round(r / count);
+                g = Math.round(g / count);
+                b = Math.round(b / count);
+                a = Math.round(a / count);
+                
+                for (let py = 0; py < pixelationLevel && y + py < pixelated.height; py++) {
+                    for (let px = 0; px < pixelationLevel && x + px < pixelated.width; px++) {
+                        const i = 4 * ((y + py) * pixelated.width + (x + px));
+                        pixelated.pixels[i] = r;
+                        pixelated.pixels[i + 1] = g;
+                        pixelated.pixels[i + 2] = b;
+                        pixelated.pixels[i + 3] = a;
                     }
                 }
             }
         }
         
-        pixelatedGraphics.updatePixels();
-        processedGraphics.image(pixelatedGraphics, 0, 0);
-    } else {
-        processedGraphics.image(img, 0, 0);
+        pixelated.updatePixels();
+        processedGraphics.image(pixelated, 0, 0);
+        pixelated.remove();
     }
-    
+
+    // Apply threshold colors
     processedGraphics.loadPixels();
-    
-    // Create a copy of the pixels array to avoid modifying it while reading
     const originalPixels = processedGraphics.pixels.slice();
     
     // Find the lightest threshold color
@@ -1159,7 +1208,7 @@ function draw() {
         strokeGraphics.remove();
     }
     
-    // Draw the processed image at the correct position and scale
+    // Draw the processed image
     image(processedGraphics, 0, 0, width, height);
 }
 
@@ -1517,4 +1566,232 @@ function saveAs(blob, filename) {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(link.href);
+}
+
+function switchThresholds() {
+    // Create a copy of the current thresholds
+    const currentThresholds = [...thresholds];
+    
+    // Sort thresholds by level in ascending order
+    thresholds.sort((a, b) => a.level - b.level);
+    
+    // Update the UI to reflect the new threshold values
+    updateThresholdUI();
+    
+    // Save the new settings
+    saveSettings();
+}
+
+function randomizeImage() {
+    // Show loading screen
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingText = document.getElementById('loading-text');
+    if (loadingScreen && loadingText) {
+        loadingScreen.style.width = canvasWidth + 'px';
+        loadingScreen.style.height = canvasHeight + 'px';
+        loadingScreen.style.backgroundColor = '#000000';
+        loadingText.style.color = '#FFFFFF';
+        loadingScreen.style.display = 'flex';
+    }
+    
+    // Load a new random image from picsum.photos
+    const timestamp = new Date().getTime();
+    img = loadImage(`https://picsum.photos/800/800?random=${timestamp}`, () => {
+        // Store original dimensions
+        originalWidth = img.width;
+        originalHeight = img.height;
+        
+        // Calculate initial scale
+        calculateScale();
+        
+        // Resize canvas
+        resizeCanvas(canvasWidth, canvasHeight);
+        
+        // Create new graphics buffers
+        if (processedGraphics) {
+            processedGraphics.remove();
+        }
+        processedGraphics = createGraphics(img.width, img.height);
+        const ctx = processedGraphics.elt.getContext('2d');
+        ctx.canvas.willReadFrequently = true;
+        
+        // Set image loaded flag
+        imageLoaded = true;
+        
+        // Hide loading screen
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+    });
+}
+
+// Add dithering algorithms
+function ditherImage(img, type, threshold) {
+    let dithered = createGraphics(img.width, img.height);
+    dithered.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
+    dithered.loadPixels();
+    
+    switch(type) {
+        case 'atkinson':
+            atkinsonDither(dithered);
+            break;
+        case 'floydsteinberg':
+            floydSteinbergDither(dithered);
+            break;
+        case 'bayer':
+            bayerDither(dithered, threshold);
+            break;
+        case 'threshold':
+            thresholdDither(dithered, threshold);
+            break;
+    }
+    
+    dithered.updatePixels();
+    return dithered;
+}
+
+function atkinsonDither(g) {
+    for (let y = 0; y < g.height; y++) {
+        for (let x = 0; x < g.width; x++) {
+            let i = (x + y * g.width) * 4;
+            let old = g.pixels[i];
+            let newVal = old < 128 ? 0 : 255;
+            g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = newVal;
+            let err = old - newVal;
+            
+            // Distribute error
+            if (x + 1 < g.width) g.pixels[i + 4] += err * 1/8;
+            if (x + 2 < g.width) g.pixels[i + 8] += err * 1/8;
+            if (y + 1 < g.height) {
+                if (x > 0) g.pixels[i + g.width * 4 - 4] += err * 1/8;
+                g.pixels[i + g.width * 4] += err * 1/8;
+                if (x + 1 < g.width) g.pixels[i + g.width * 4 + 4] += err * 1/8;
+            }
+            if (y + 2 < g.height) g.pixels[i + g.width * 8] += err * 1/8;
+        }
+    }
+}
+
+function floydSteinbergDither(g) {
+    for (let y = 0; y < g.height; y++) {
+        for (let x = 0; x < g.width; x++) {
+            let i = (x + y * g.width) * 4;
+            let old = g.pixels[i];
+            let newVal = old < 128 ? 0 : 255;
+            g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = newVal;
+            let err = old - newVal;
+            
+            // Distribute error
+            if (x + 1 < g.width) g.pixels[i + 4] += err * 7/16;
+            if (y + 1 < g.height) {
+                if (x > 0) g.pixels[i + g.width * 4 - 4] += err * 3/16;
+                g.pixels[i + g.width * 4] += err * 5/16;
+                if (x + 1 < g.width) g.pixels[i + g.width * 4 + 4] += err * 1/16;
+            }
+        }
+    }
+}
+
+function bayerDither(g, threshold) {
+    const bayerMatrix = [
+        [0, 8, 2, 10],
+        [12, 4, 14, 6],
+        [3, 11, 1, 9],
+        [15, 7, 13, 5]
+    ];
+    
+    for (let y = 0; y < g.height; y++) {
+        for (let x = 0; x < g.width; x++) {
+            let i = (x + y * g.width) * 4;
+            let old = g.pixels[i];
+            let bayerValue = bayerMatrix[y % 4][x % 4] * 16;
+            let newVal = old < threshold + bayerValue ? 0 : 255;
+            g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = newVal;
+        }
+    }
+}
+
+function thresholdDither(g, threshold) {
+    for (let y = 0; y < g.height; y++) {
+        for (let x = 0; x < g.width; x++) {
+            let i = (x + y * g.width) * 4;
+            let old = g.pixels[i];
+            let newVal = old < threshold ? 0 : 255;
+            g.pixels[i] = g.pixels[i + 1] = g.pixels[i + 2] = newVal;
+        }
+    }
+}
+
+// Add key press handler
+function keyPressed() {
+    if (key === '1') ditherType = 'atkinson';
+    else if (key === '2') ditherType = 'floydsteinberg';
+    else if (key === '3') ditherType = 'bayer';
+    else if (key === '4') ditherType = 'threshold';
+    else if (key === '5') ditherType = 'none';
+}
+
+// Add function to update color pickers based on Riso mode
+function updateColorPickers() {
+    const colorPickers = selectAll('input[type="color"]');
+    colorPickers.forEach(picker => {
+        if (useRisoColors) {
+            picker.attribute('list', 'riso-colors');
+            // Set the color to the closest Riso color
+            const currentColor = picker.value();
+            const closestRisoColor = findClosestRisoColor(currentColor);
+            picker.value(closestRisoColor);
+            
+            // Update the corresponding hex input
+            const hexInput = picker.nextElementSibling;
+            if (hexInput && hexInput.classList.contains('hex-input')) {
+                hexInput.value = closestRisoColor;
+            }
+            
+            // Update the corresponding threshold color
+            const index = parseInt(picker.id().replace('threshold', '').replace('-color-picker', ''));
+            if (!isNaN(index) && index > 0 && index <= thresholds.length) {
+                thresholds[index - 1].color = closestRisoColor;
+            }
+        } else {
+            picker.removeAttribute('list');
+        }
+    });
+    
+    // Force a redraw to update the preview
+    draw();
+}
+
+// Add function to find closest Riso color
+function findClosestRisoColor(hexColor) {
+    const color = hexToRgb(hexColor);
+    let closestColor = risoColors[0];
+    let minDistance = Infinity;
+    
+    for (const risoColor of risoColors) {
+        const risoRgb = hexToRgb(risoColor);
+        const distance = Math.sqrt(
+            Math.pow(color.r - risoRgb.r, 2) +
+            Math.pow(color.g - risoRgb.g, 2) +
+            Math.pow(color.b - risoRgb.b, 2)
+        );
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestColor = risoColor;
+        }
+    }
+    
+    return closestColor;
+}
+
+// Add function to toggle Riso colors
+function toggleRisoColors() {
+    useRisoColors = !useRisoColors;
+    const checkbox = select('#riso-colors-checkbox');
+    if (checkbox) {
+        checkbox.checked(useRisoColors);
+    }
+    updateColorPickers();
+    saveSettings();
 }

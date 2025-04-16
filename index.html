@@ -395,6 +395,7 @@
                 <h3>Threshold Actions</h3>
                 <div class="control-group">
                     <button id="random-btn" class="action-button">Randomize Thresholds</button>
+                    <button id="random-image-btn" class="action-button">Randomize Image</button>
                     <button id="save-btn" class="action-button">Save Threshold Image</button>
                 </div>
             </div>
@@ -438,10 +439,11 @@
             </div>
             
             <div class="controls-section">
-                <h3>Threshold Levels</h3>
+                <h3>Thresholds</h3>
                 <div id="threshold-container">
                     <!-- Threshold controls will be added here -->
                 </div>
+                <button id="switch-thresholds" class="action-button">Sort Thresholds</button>
             </div>
             
             <div class="controls-section">
@@ -476,6 +478,19 @@
                     </label>
                 </div>
             </div>
+            <div class="control-group">
+                <label for="riso-colors-checkbox">Use Riso Colors</label>
+                <input type="checkbox" id="riso-colors-checkbox" onchange="toggleRisoColors()">
+            </div>
+            <datalist id="riso-colors">
+                <option value="#0078bf">Blue</option>
+                <option value="#ff7477">Red</option>
+                <option value="#ffe800">Yellow</option>
+                <option value="#ff48b0">Pink</option>
+                <option value="#5ec8e5">Cyan</option>
+                <option value="#00a95c">Green</option>
+                <option value="#ffffff">White</option>
+            </datalist>
         </div>
     </div>
 </body>
